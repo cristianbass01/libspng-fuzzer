@@ -51,5 +51,6 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
-# Fuzzing executables
+# Fuzzing executables and programs
 *.fuzz
+zzuf*

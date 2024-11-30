@@ -33,7 +33,13 @@ else
       ;;
     zzuf)
       echo "Installing zzuf..."
-      sudo apt-get install zzuf
+      wget https://github.com/samhocevar/zzuf/releases/download/v0.15/zzuf-0.15.tar.gz
+      tar -xzvf zzuf-0.15.tar.gz 
+      rm zzuf-0.15.tar.gz
+      cd zzuf-0.15
+      ./configure
+      make
+      cp src/zzuf .
       echo """
         zzuf installed successfully!
 
