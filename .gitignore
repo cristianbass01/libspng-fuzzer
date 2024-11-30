@@ -30,7 +30,6 @@
 
 # Executables
 *.exe
-*.out
 *.app
 *.i*86
 *.x86_64
@@ -51,6 +50,6 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
-# Fuzzing executables and programs
+# Fuzzing executables, files, inputs, and outputs
 *.fuzz
-zzuf*
+zzuf-0.15/

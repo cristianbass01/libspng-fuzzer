@@ -39,7 +39,9 @@ else
       cd zzuf-0.15
       ./configure
       make
-      cp src/zzuf .
+      sudo cp src/zzuf /usr/local/bin
+      sudo mkdir /usr/local/lib/zzuf || true
+      sudo cp src/.libs/libzzuf.so /usr/local/lib/zzuf
       echo """
         zzuf installed successfully!
 
