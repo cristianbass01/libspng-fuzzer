@@ -5,7 +5,7 @@ int main()
 {
     spng_ctx *ctx = spng_ctx_new(0);
     size_t img_size;
-    FILE *f = fopen("test.png", "rb");
+    FILE *f = fopen("/dev/zero", "rb");
     if (f == NULL)
     {
         printf("File not found\n");

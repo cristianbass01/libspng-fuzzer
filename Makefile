@@ -14,7 +14,7 @@ libspng: libspng/build/libspng.so
 libspng/build/libspng.so: libspng/build/Makefile
 	$(MAKE) -C libspng/build
 
-fuzz: libspng/build/libspng.so fuzz/test.fuzz
+fuzz: libspng/build/libspng.so fuzz/test_fuzzer_descriptor.fuzz fuzz/decode_dev_zero.fuzz fuzz/simple_decode_dev_zero.fuzz
 
 # Maybe try with some fsanitize options: https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html
 fuzz/%.fuzz: fuzz/%.c libspng/build/libspng.so
