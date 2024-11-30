@@ -95,14 +95,37 @@ else
       make
       sudo make install
       cd ..
+      echo """
+        Honggfuzz installed successfully!
+
+        For more information, visit:
+        https://github.com/google/honggfuzz
+      """
       ;;
     clang)
       echo "Installing clang..."
       sudo apt-get install clang
+      echo """
+        clang installed successfully!
+
+        Now you can use ASan and MSan sanitizers.
+
+        For more information, visit:
+        https://github.com/google/sanitizers/wiki/AddressSanitizer
+        https://github.com/google/sanitizers/wiki/MemorySanitizer
+      """
       ;;
     valgrind)
       echo "Installing Valgrind..."
       sudo apt-get install valgrind
+      echo """
+        Valgrind installed successfully!
+
+        Now you can use Memcheck sanitizer.
+
+        For more information, visit:
+        http://valgrind.org/docs/manual/quick-start.html
+      """
       ;;
     *)
       echo "Unknown fuzzer: $1"
