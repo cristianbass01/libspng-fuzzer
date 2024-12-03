@@ -26,7 +26,7 @@ static int stream_write_fn(spng_ctx *ctx, void *user, void *data, size_t length)
 }
 
 
-#define test(fn) fn_ret=fn; if(fn_ret){fprintf(stderr, "Error: %s returned %d: %s\n", #fn, fn_ret, spng_strerror(fn_ret)); goto error;}
+#define test(fn) printf("Test %s... ", #fn); fn_ret = fn; if(fn_ret){fprintf(stderr, "Error: %s returned %d: %s\n", #fn, fn_ret, spng_strerror(fn_ret)); goto error;} printf("OK\n");
 
 int fuzz_spng_write(const uint8_t* data, size_t size)
 {

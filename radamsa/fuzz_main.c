@@ -50,8 +50,8 @@ int main(int argc, char **argv)
         goto error;
     }
 
-    fuzz_spng_read((const uint8_t*)buf, siz_buf);
-    //fuzz_spng_write((const uint8_t*)buf, siz_buf);
+    //fuzz_spng_read((const uint8_t*)buf, siz_buf);
+    fuzz_spng_write((const uint8_t*)buf, siz_buf);
 
     free(buf);
     if (f != NULL) fclose(f);
