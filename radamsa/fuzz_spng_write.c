@@ -26,7 +26,14 @@ static int stream_write_fn(spng_ctx *ctx, void *user, void *data, size_t length)
 }
 
 
-#define test(fn) printf("Test %s... ", #fn); fn_ret = fn; if(fn_ret){fprintf(stderr, "Error: %s returned %d: %s\n", #fn, fn_ret, spng_strerror(fn_ret)); goto error;} printf("OK\n");
+#define test(fn) \
+    printf("Testing %s... ", #fn); \
+    fn_ret = fn; \
+    if(fn_ret){ \
+        printf("\nError: %s returned %d: %s\n", #fn, fn_ret, spng_strerror(fn_ret)); \
+        goto err; \
+    } \
+    printf("OK\n");
 
 int fuzz_spng_write(const uint8_t* data, size_t size)
 {
@@ -132,7 +139,7 @@ int fuzz_spng_write(const uint8_t* data, size_t size)
         case SPNG_COLOR_TYPE_TRUECOLOR_ALPHA:
             pixel_bits = ihdr.bit_depth * 4;
             break;
-        default: goto error;
+        default: goto err;
     }
     img_size = ihdr.width * pixel_bits + 7;
     img_size /= 8;
@@ -171,17 +178,25 @@ int fuzz_spng_write(const uint8_t* data, size_t size)
     }
 
     // Test spng_ctx_free    
-    spng_ctx_free(ctx);
+    if(ctx != NULL){
+        printf("Testing spng_ctx_free...");
+        spng_ctx_free(ctx);
+        printf("OK\n");
+    } 
     // end spng_ctx_free
 
-    free(png);
+    if(png != NULL) free(png);
     return 0;
 
-error:
+err:
     // Test spng_ctx_free    
-    spng_ctx_free(ctx);
+    if(ctx != NULL){
+        printf("Testing spng_ctx_free...");
+        spng_ctx_free(ctx);
+        printf("OK\n");
+    } 
     // end spng_ctx_free
 
-    free(png);
+    if(png != NULL) free(png);
     return 1;
 }

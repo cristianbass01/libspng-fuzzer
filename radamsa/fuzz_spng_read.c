@@ -25,7 +25,14 @@ static int buffer_read_fn(spng_ctx *ctx, void *user, void *dest, size_t length)
 }
 // end spng.c
 
-#define test(fn) printf("Test %s... ", #fn); fn_ret = fn; if(fn_ret){fprintf(stderr, "Error: %s returned %d: %s\n", #fn, fn_ret, spng_strerror(fn_ret)); goto error;} printf("OK\n");
+#define test(fn) \
+    printf("Testing %s... ", #fn); \
+    fn_ret = fn; \
+    if(fn_ret){ \
+        printf("\nError: %s returned %d: %s\n", #fn, fn_ret, spng_strerror(fn_ret)); \
+        goto err; \
+    } \
+    printf("OK\n");
 
 void choose_random_options(enum spng_option options_list[], int TOTAL_OPTIONS, int num_options, int chosen_options[], int chosen_values[]){
     for(int i = 0; i < num_options; i++){
@@ -290,10 +297,10 @@ int fuzz_spng_read(const uint8_t* data, size_t size)
 
     return 0;
 
-error:
+err:
     // Test spng_ctx_free
     if(ctx != NULL){
-        printf("Testing spng_ctx_free...\n");
+        printf("Testing spng_ctx_free...");
         spng_ctx_free(ctx);
         printf("OK\n");
     } 
