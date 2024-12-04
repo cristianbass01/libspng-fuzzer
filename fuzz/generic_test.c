@@ -7,24 +7,18 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#define FUZZ_READ 1
+//#define FUZZ_READ 1
 
-#define test(fn)                                                          \
-    printf("Testing %s... ", #fn);                                                   \
-    fn_ret = fn;                                                                     \
-    if (fn_ret)                                                                      \
-    {                                                                                \
-        printf("\nError: %s returned %d: %s\n", #fn, fn_ret, spng_strerror(fn_ret)); \
-        goto err;                                                                    \
-    }                                                                                \
-    printf("OK\n");
+#define test(fn)                                                       \
+    printf("Testing %s... ", #fn);                                     \
+    fn_ret = fn;                                                       \
+    if (fn_ret)                                                        \
+        printf("returned %d: %s\n", fn_ret, spng_strerror(fn_ret));    \
+    else printf("OK\n");
 
 // DECLARATION:
 int fuzz_spng_read(const uint8_t* data, size_t size);
 int fuzz_spng_write(const uint8_t* data, size_t size);
-
-struct buf_state;
-static int buffer_read_fn(spng_ctx *ctx, void *user, void *dest, size_t length);
 
 ////////////////////////////////////////
 // MAIN:
@@ -256,6 +250,9 @@ int fuzz_spng_read(const uint8_t* data, size_t size)
     struct spng_unknown_chunk chunks[4] = {0};
     uint32_t n_text = 4, n_splt = 4, n_chunks = 4;
 
+    struct spng_offs offs;
+    struct spng_exif exif;
+
     struct buf_state state;
     state.data = data;
     state.bytes_left = size;
@@ -291,20 +288,18 @@ int fuzz_spng_read(const uint8_t* data, size_t size)
     int TOTAL_OPTIONS = sizeof(options_list) / sizeof(enum spng_option);
 
     // Set up random configuration
-    int stream = 1;
-    int file_stream = 1;
+    int stream = rand() % 2;
+    int file_stream = rand() % 2;
     int discard = rand() % 2;
     int progressive = rand() % 2;
     int fmt = fmt_flags[rand() % TOTAL_TMP_FLAGS];
     fmt = SPNG_FMT_RGBA8;
     int flags = decode_flags[rand() % TOTAL_DECODE_FLAGS];
     
-    /*
     int num_options = rand() % TOTAL_OPTIONS;
     int chosen_options[num_options];
     int chosen_values[num_options];
     choose_random_options(options_list, TOTAL_OPTIONS, num_options, chosen_options, chosen_values);
-    */
 
     // Print configuration
     printf("stream: %d\n", stream);
@@ -313,13 +308,20 @@ int fuzz_spng_read(const uint8_t* data, size_t size)
     printf("progressive: %d\n", progressive);
     printf("fmt: %d\n", fmt);
     printf("flags: %d\n", flags);
-    //printf("num_options: %d\n", num_options);
+    printf("num_options: %d\n", num_options);
+
+    for(int i = 0; i < num_options; i++){
+        printf("Option %d, Value %d\n", chosen_options[i], chosen_values[i]);
+    }
     
     // end Initialization
 
+    // print version
+    printf("libspng version: %s\n", spng_version_string());
+
     // Test spng_ctx_new
     spng_ctx *ctx = spng_ctx_new(SPNG_CTX_IGNORE_ADLER32);
-    test(ctx == NULL);
+    if(ctx == NULL) return 0;
 
     if(stream)
     {
@@ -327,7 +329,7 @@ int fuzz_spng_read(const uint8_t* data, size_t size)
             // Simulate a file stream from data
             file = fmemopen((void*)data, size, "rb");
 
-            test(file == NULL);
+            if(file == NULL) goto err;
             
             test(spng_set_png_file(ctx, file));
         }
@@ -339,30 +341,40 @@ int fuzz_spng_read(const uint8_t* data, size_t size)
         test(spng_set_png_buffer(ctx, (void*)data, size));
     }
 
+    if(fn_ret) goto err;
+
+    int width, height;
+    test(spng_get_image_limits(ctx, &width, &height));
     test(spng_set_image_limits(ctx, 200000, 200000));
-        
-    int limits = 4 * 1000 * 1000;
+
+    size_t limits;
+    test(spng_get_chunk_limits(ctx, &limits, &limits));
+
+    limits = 4 * 1000 * 1000;
     test(spng_set_chunk_limits(ctx, limits, limits * 2));
 
     test(spng_set_crc_action(ctx, SPNG_CRC_USE, discard ? SPNG_CRC_DISCARD : SPNG_CRC_USE))
 
-    test(spng_set_option(ctx, SPNG_KEEP_UNKNOWN_CHUNKS, 1));
-
-    /*
+    // Test set_option with different configurations
     for(int i = 0; i < num_options; i++){
-        printf("Option %d: %d -> %d\n", i, chosen_options[i], chosen_values[i]);
         test(spng_set_option(ctx, chosen_options[i], chosen_values[i]));
     }
-    */
+
+    test(spng_set_option(ctx, SPNG_KEEP_UNKNOWN_CHUNKS, 1));
+
+    // Test get_option for all options
+    int value;
+    for(int i = 0; i < TOTAL_OPTIONS; i++){
+        test(spng_get_option(ctx, options_list[i], &value));
+    }
 
     size_t out_size;
     test(spng_decoded_image_size(ctx, fmt, &out_size));
-
-    test(out_size > 800000000);
+    if(fn_ret) goto err;
+    if(out_size > 80000000) goto err;
 
     img = (unsigned char*)malloc(out_size);
-    
-    test(img == NULL);
+    if(img == NULL) goto err;
 
     //// Test get methods
     test(spng_get_ihdr(ctx, &ihdr));
@@ -377,48 +389,85 @@ int fuzz_spng_read(const uint8_t* data, size_t size)
     test(spng_get_srgb(ctx, &srgb_rendering_intent));
 
     // Test spng_get_text for 4 and for arbitrary number
-    test(spng_get_text(ctx, text, &n_text));
-    test(spng_get_text(ctx, NULL, &n_text));
-    for(uint32_t i = 0; i < n_text; i++)
-    {
-        // All strings should be non-NULL
-        test(text[i].text == NULL);
-        test(text[i].keyword[0] == '\0');
-        test(text[i].language_tag == NULL);
-        test(text[i].translated_keyword == NULL);
-        test(memchr(text[i].keyword, 0, 80) == NULL);
-        
-        /* This shouldn't cause issues either */
-        text[i].length = strlen(text[i].text);
+    printf("Testing spng_get_text...");
+    if(!spng_get_text(ctx, text, &n_text))
+    {/* Up to 4 entries were read, get the actual count */
+        spng_get_text(ctx, NULL, &n_text);
+        for(uint32_t i = 0; i < n_text; i++)
+        {
+            // All strings should be non-NULL
+            if(text[i].text == NULL ||
+                text[i].keyword[0] == '\0' ||
+                text[i].language_tag == NULL ||
+                text[i].translated_keyword == NULL ||
+                memchr(text[i].keyword, 0, 80) == NULL)
+            {
+                spng_ctx_free(ctx);
+                free(img);
+                return 1;
+            }
+
+            /* This shouldn't cause issues either */
+            text[i].length = strlen(text[i].text);
+        }
     }
+    printf("OK\n");
 
     test(spng_get_bkgd(ctx, &bkgd));
     test(spng_get_hist(ctx, &hist));
     test(spng_get_phys(ctx, &phys));
 
     // Test spng_get_splt for 4 and for arbitrary number
-    test(spng_get_splt(ctx, splt, &n_splt));
-    test(spng_get_splt(ctx, NULL, &n_splt));
-    for(uint32_t i = 0; i < n_splt; i++)
-    {
-        test(splt[i].name[0] == '\0');
-        test(splt[i].entries == NULL);
-        test(memchr(splt[i].name, 0, 80) == NULL);
+    printf("Testing spng_get_splt...");
+    if(!spng_get_splt(ctx, splt, &n_splt))
+    {/* Up to 4 entries were read, get the actual count */
+        spng_get_splt(ctx, NULL, &n_splt);
+        for(uint32_t i = 0; i < n_splt; i++)
+        {
+            if(splt[i].name[0] == '\0' ||
+                splt[i].entries == NULL ||
+                memchr(splt[i].name, 0, 80) == NULL)
+            {
+                spng_ctx_free(ctx);
+                free(img);
+                return 1;
+            }
+        }
     }
+    printf("OK\n");
 
     // Test spng_get_unknown_chunks for 4 and for arbitrary number
-    test(spng_get_unknown_chunks(ctx, chunks, &n_chunks));
-    test(spng_get_unknown_chunks(ctx, NULL, &n_chunks));
-    for(uint32_t i = 0; i < n_chunks; i++)
+    if(!spng_get_unknown_chunks(ctx, chunks, &n_chunks))
     {
-        test(chunks[i].length && !chunks[i].data);
-        test(!chunks[i].length && chunks[i].data);
+        spng_get_unknown_chunks(ctx, NULL, &n_chunks);
+        for(uint32_t i = 0; i < n_chunks; i++)
+        {
+            if( (chunks[i].length && !chunks[i].data) ||
+                (!chunks[i].length && chunks[i].data) )
+            {
+                spng_ctx_free(ctx);
+                free(img);
+                return 1;
+            }
+        }
     }
+
+    test(spng_get_offs(ctx, &offs));
+    test(spng_get_exif(ctx, &exif));
     
     if(progressive)
     {
-        test(spng_decode_image(ctx, NULL, 0, fmt, flags | SPNG_DECODE_PROGRESSIVE));
+        // test scanline
+        test(spng_decode_scanline(ctx, img, out_size));
 
+        // test decode_chunks
+        test(spng_decode_chunks(ctx));
+
+        // test decode_image
+        test(spng_decode_image(ctx, NULL, 0, fmt, flags | SPNG_DECODE_PROGRESSIVE));
+        if(fn_ret) goto err;
+
+        // test row
         size_t ioffset, out_width = out_size / ihdr.height;
         struct spng_row_info ri;
         do
@@ -429,11 +478,12 @@ int fuzz_spng_read(const uint8_t* data, size_t size)
     }
     else{
         test(spng_decode_image(ctx, img, out_size, fmt, flags));
+        if(fn_ret) goto err;
     }
 
     test(spng_get_time(ctx, &time));
 
-    // Test spng_ctx_free    
+    // Test spng_ctx_free
     if(ctx != NULL){
         printf("Testing spng_ctx_free...");
         spng_ctx_free(ctx);
@@ -460,7 +510,7 @@ err:
     if(img != NULL) free(img);
     if(file != NULL) fclose(file);
 
-    return 1;
+    return 0;
 }
 
 /// @brief Fuzz function for spng_write
@@ -497,6 +547,9 @@ int fuzz_spng_write(const uint8_t* data, size_t size)
     struct spng_unknown_chunk chunks[4] = {0};
     uint32_t n_text = 4, n_splt = 4, n_chunks = 4;
 
+    struct spng_offs offs;
+    struct spng_exif exif;
+
     struct buf_state state;
     state.data = NULL;
     state.bytes_left = SIZE_MAX;
@@ -509,17 +562,54 @@ int fuzz_spng_write(const uint8_t* data, size_t size)
     };
     int TOTAL_TMP_FLAGS = sizeof(fmt_flags) / sizeof(enum spng_format);
 
+    enum spng_option options_list[] = {
+        SPNG_KEEP_UNKNOWN_CHUNKS, // true, false
+        SPNG_IMG_COMPRESSION_LEVEL, // defaul -1, 0-9
+        SPNG_IMG_WINDOW_BITS, // default 15, 8-15
+        SPNG_IMG_MEM_LEVEL, // default 8, 1-9
+        SPNG_IMG_COMPRESSION_STRATEGY, // default 0, 0-4
+        SPNG_TEXT_COMPRESSION_LEVEL, // default -1, 0-9
+        SPNG_TEXT_WINDOW_BITS, // default 15, 8-15
+        SPNG_TEXT_MEM_LEVEL, // default 8, 1-9
+        SPNG_TEXT_COMPRESSION_STRATEGY, // default 0, 0-4
+        SPNG_FILTER_CHOICE, // default 0, 0-4
+        SPNG_CHUNK_COUNT_LIMIT, // default 0, 0-UINT32_MAX
+        SPNG_ENCODE_TO_BUFFER // true, false
+    };
+    int TOTAL_OPTIONS = sizeof(options_list) / sizeof(enum spng_option);
+
     // Set up random configuration
     int stream = rand() % 2;
     int get_buffer = rand() % 2;
     int progressive = rand() % 2;
     int fmt = fmt_flags[rand() % TOTAL_TMP_FLAGS];
+    int flags = rand() % 2;
 
+    int num_options = rand() % TOTAL_OPTIONS;
+    int chosen_options[num_options];
+    int chosen_values[num_options];
+    choose_random_options(options_list, TOTAL_OPTIONS, num_options, chosen_options, chosen_values);
+
+    // Print configuration
+    printf("stream: %d\n", stream);
+    printf("get_buffer: %d\n", get_buffer);
+    printf("progressive: %d\n", progressive);
+    printf("fmt: %d\n", fmt);
+    printf("flags: %d\n", flags);
+    printf("num_options: %d\n", num_options);
+
+    for(int i = 0; i < num_options; i++){
+        printf("Option %d, Value %d\n", chosen_options[i], chosen_values[i]);
+    }
+    
     // end Initialization
+
+    // print version
+    printf("libspng version: %s\n", spng_version_string());
 
     // Test spng_ctx_new
     spng_ctx *ctx = spng_ctx_new(SPNG_CTX_ENCODER);
-    test(ctx == NULL);
+    if(ctx == NULL) return 0;
 
     test(spng_set_image_limits(ctx, 200000, 200000));
 
@@ -535,7 +625,15 @@ int fuzz_spng_write(const uint8_t* data, size_t size)
         test(spng_set_option(ctx, SPNG_ENCODE_TO_BUFFER, 1));
     } 
 
+    if(fn_ret) goto err;
+
+    for(int i = 0; i < num_options; i++){
+        test(spng_set_option(ctx, chosen_options[i], chosen_values[i]));
+    }
+
     test(spng_set_ihdr(ctx, &ihdr));
+    if(fn_ret) goto err;
+
     test(spng_set_plte(ctx, &plte));
     test(spng_set_trns(ctx, &trns));
     test(spng_set_chrm(ctx, &chrm));
@@ -552,6 +650,8 @@ int fuzz_spng_write(const uint8_t* data, size_t size)
     test(spng_set_splt(ctx, splt, n_splt));
     test(spng_set_time(ctx, &time));
     test(spng_set_unknown_chunks(ctx, chunks, n_chunks));
+    test(spng_set_offs(ctx, &offs));
+    test(spng_set_exif(ctx, &exif));
 
     // Test colorspace
     switch(ihdr.color_type)
@@ -577,15 +677,23 @@ int fuzz_spng_write(const uint8_t* data, size_t size)
     img_size /= 8;
     img_size *= ihdr.height;
 
-    test(img_size > size);
-    test(img_size > 80000000);
+    if(img_size > size) goto err;
+    if(img_size > 80000000) goto err;
 
     img = (unsigned char*)data;
 
     if(progressive)
     {
-        test(spng_encode_image(ctx, NULL, 0, fmt, SPNG_ENCODE_PROGRESSIVE | SPNG_ENCODE_FINALIZE));
+        // test scanline
+        test(spng_encode_scanline(ctx, img, img_size));
 
+        test(spng_encode_image(ctx, NULL, 0, fmt, SPNG_ENCODE_PROGRESSIVE | SPNG_ENCODE_FINALIZE));
+        if(fn_ret) goto err;
+
+        // test encode_chunks
+        test(spng_encode_chunks(ctx));
+
+        // test row
         size_t ioffset, img_width = img_size / ihdr.height;
         struct spng_row_info ri;
 
@@ -597,6 +705,7 @@ int fuzz_spng_write(const uint8_t* data, size_t size)
     }
     else{
         test(spng_encode_image(ctx, img, img_size, fmt, SPNG_ENCODE_FINALIZE));
+        if(fn_ret) goto err;
     }
 
     if(get_buffer)
@@ -604,9 +713,9 @@ int fuzz_spng_write(const uint8_t* data, size_t size)
         png = spng_get_png_buffer(ctx, &png_size, &fn_ret);
 
         // These are potential vulnerabilities
-        test(png && !png_size);
-        test(!png && png_size);
-        test(fn_ret && (png || png_size));
+        if(png && !png_size) return 1;
+        if(!png && png_size) return 1;
+        if(fn_ret && (png || png_size)) return 1;
     }
 
     // Test spng_ctx_free    
@@ -617,6 +726,7 @@ int fuzz_spng_write(const uint8_t* data, size_t size)
     } 
     // end spng_ctx_free
 
+    printf("Finished\n");
     if(png != NULL) free(png);
     return 0;
 
@@ -628,7 +738,7 @@ err:
         printf("OK\n");
     } 
     // end spng_ctx_free
-
+    printf("Finished with error\n");
     if(png != NULL) free(png);
-    return 1;
+    return 0;
 }
