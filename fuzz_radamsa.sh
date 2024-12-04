@@ -18,7 +18,7 @@ mkdir -p $SEGM_FAULT_LOG_DIR
 # Initialize mutation count
 COUNTER=0
 SEED_NUMBER=0
-MUTATIONS_PER_SEED_FILE=100  # Number of mutations per seed file
+MUTATIONS_PER_SEED_FILE=10  # Number of mutations per seed file
 COUNTER_ERRORS=0
 COUNTER_SEG_FAULTS=0
 
@@ -27,19 +27,20 @@ while true; do
     # Loop over each seed file in the seed directory
     for SEED_FILE in $SEED_DIR/*.png; do
         SEED_NAME=$(basename "$SEED_FILE")  # Get the filename without the path
+        SEED_NAME="${SEED_NAME%.*}"  # Remove the file extension
 
         # Generate mutated versions from seed file
         SEED_NUMBER=$((SEED_NUMBER + 1))
 
         # Mutate the seed file using Radamsa
-        MUTATED_FILES="$MUTATED_DIR/mutated_%n.png"
+        MUTATED_FILES="$MUTATED_DIR/${SEED_NAME}_%n.png"
 
         radamsa -o $MUTATED_FILES -s $SEED_NUMBER -n $MUTATIONS_PER_SEED_FILE $SEED_FILE
 
         for MUTATED_FILE in $MUTATED_DIR/*; do
             # Run the mutated file through the program that uses libspng
             # Capture the exit status of the program
-            $EXECUTABLE $MUTATED_FILE > $TMP_LOG_FILE 2>&1
+            $EXECUTABLE $MUTATED_FILE >> $TMP_LOG_FILE 2>&1
             EXIT_STATUS=$?
 
             # Print the current mutation count on the same line
@@ -81,5 +82,9 @@ while true; do
             echo -ne "Counter $COUNTER - Mutating $SEED_NAME - Error count $COUNTER_ERRORS - Segmentation fault count $COUNTER_SEG_FAULTS\r"
 
         done  # Inner for loop for all mutated files
+        
+        # Delete the mutated files to save space
+        rm -f $MUTATED_DIR/*
+
     done  # Outer for loop for all seed files
 done  # Outer while loop for continuous fuzzing across all seed files

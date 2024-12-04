@@ -18,7 +18,93 @@
 
 // DECLARATION:
 int fuzz_spng_read(const uint8_t* data, size_t size);
-int fuzz_spng_write(const uint8_t* data, size_t size);
+
+enum feature {
+    UNKNOWN,
+    SIZE,
+    BACKGROUND,
+    TRANSPARENCY,
+    GAMMA,
+    FILTERING,
+    PALETTE,
+    CHUNKS,
+    CHUNK_ORDERING,
+    HISTOGRAM,
+    PHYSICAL_PIXELS,
+    TEXT,
+    TIME,
+    SIGNIFICANT_BITS,
+    COMPRESSION,
+    CORRUPTED,
+    EXIF
+};
+
+enum background {
+    NO_BACKGROUND,
+    BLACK,
+    GRAY,
+    WHITE,
+    YELLOW
+};
+
+enum transparency {
+    NO_TRANSPARENT,
+    TRANSPARENT
+};
+
+enum filtering {
+    NO_FILTERING,
+    SUB,
+    UP,
+    AVERAGE,
+    PAETH
+};
+
+enum palette {
+    PALETTE_CHUNK,
+    SUGGESTED_PALETTE_1_BYTE,
+    SUGGESTED_PALETTE_2_BYTE
+};
+
+enum text {
+    NO_TEXT,
+    TEXT_CHUNK,
+    COMPRESSED_TEXT,
+    INTERNATIONAL_TEXT_ENGLISH,
+    INTERNATIONAL_TEXT_FINNISH,
+    INTERNATIONAL_TEXT_GREEK,
+    INTERNATIONAL_TEXT_HINDI,
+    INTERNATIONAL_TEXT_JAPANESE,
+};
+
+// Define a struct to store PNG properties
+typedef struct {
+    enum feature testFeature;       // Feature being tested (e.g., gamma, filtering)
+    int size;                       // Size of the image
+    enum background background;     // Background color
+    enum transparency transparency; // Transparency value
+    double gamma;                      // Gamma value
+    enum spng_filter filtering;       // Filtering method
+    enum palette palette;           // Palette method
+    int significant_bits;           // Significant bits
+    int histogram_colors;           // Number of colors in the histogram
+    int ppu_x;            // Physical pixels
+    int ppu_y;            // Physical pixels
+    int unit_specifier;   // Unit specifier
+    enum text text;
+    struct spng_time time;       // Time
+    int chunk_ordering;             // Chunk ordering
+    int compression;                // Compression level
+    enum spng_interlace_method interlace; // Interlace method (enum)
+    enum spng_color_type colorType;       // Color type (enum)
+    uint8_t bitDepth;           // Bit depth of the image
+} PNGConfig;
+
+
+int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config);
+
+PNGConfig getPNGConfig(const char *fileName);
+void getFileName(const char *path, char *output);
 
 ////////////////////////////////////////
 // MAIN:
@@ -82,7 +168,11 @@ int main(int argc, char **argv)
 #if FUZZ_READ == 1
     success = fuzz_spng_read((const uint8_t *)buf, siz_buf);
 #else
-    success = fuzz_spng_write((const uint8_t *)buf, siz_buf);
+    char fileName[256];
+    getFileName(argv[1], fileName);
+    printf("File name: %s\n", fileName);
+    PNGConfig config = getPNGConfig(fileName);
+    success = fuzz_spng_write((const uint8_t *)buf, siz_buf, config);
 #endif
 
     free(buf);
@@ -172,13 +262,14 @@ static int stream_write_fn(spng_ctx *ctx, void *user, void *data, size_t length)
 void choose_random_options(enum spng_option options_list[], int TOTAL_OPTIONS, int num_options, int chosen_options[], int chosen_values[]){
     for(int i = 0; i < num_options; i++){
         chosen_options[i] = options_list[rand() % TOTAL_OPTIONS];
+        int compression_levels[] = {0, 1, 2, 9};
         switch (chosen_options[i])
         {
         case SPNG_KEEP_UNKNOWN_CHUNKS:
             chosen_values[i] = rand() % 2;
             break;
         case SPNG_IMG_COMPRESSION_LEVEL:
-            chosen_values[i] = rand() % 11 - 1;
+            chosen_values[i] = compression_levels[rand() % 4];
             break;
         case SPNG_IMG_WINDOW_BITS:
             chosen_values[i] = rand() % 8 + 8;
@@ -190,7 +281,7 @@ void choose_random_options(enum spng_option options_list[], int TOTAL_OPTIONS, i
             chosen_values[i] = rand() % 5;
             break;
         case SPNG_TEXT_COMPRESSION_LEVEL:
-            chosen_values[i] = rand() % 11 - 1;
+            chosen_values[i] = compression_levels[rand() % 4];
             break;
         case SPNG_TEXT_WINDOW_BITS:
             chosen_values[i] = rand() % 8 + 8;
@@ -202,7 +293,8 @@ void choose_random_options(enum spng_option options_list[], int TOTAL_OPTIONS, i
             chosen_values[i] = rand() % 5;
             break;
         case SPNG_FILTER_CHOICE:
-            chosen_values[i] = rand() % 5;
+            int filter_choices[] = {SPNG_DISABLE_FILTERING, SPNG_FILTER_CHOICE_NONE, SPNG_FILTER_CHOICE_SUB, SPNG_FILTER_CHOICE_UP, SPNG_FILTER_CHOICE_AVG, SPNG_FILTER_CHOICE_PAETH, SPNG_FILTER_CHOICE_ALL};
+            chosen_values[i] = rand() % 7;
             break;
         case SPNG_CHUNK_COUNT_LIMIT:
             chosen_values[i] = rand() % UINT32_MAX;
@@ -513,11 +605,316 @@ err:
     return 0;
 }
 
+//////////////////////////////////////////////
+// CONFIGURATION FUNCTIONS:
+//////////////////////////////////////////////
+
+enum background getBackground(char background) {
+    switch (background)
+    {
+    case 'a':
+        return NO_BACKGROUND;
+    case 'b':
+        return BLACK;
+    case 'g':
+        return GRAY;
+    case 'w':
+        return WHITE;
+    case 'y':
+        return YELLOW;
+    default:
+        return NO_BACKGROUND;
+    }
+}
+
+// Function to derive a PNGConfig from the file name
+PNGConfig getPNGConfig(const char *fileName) {
+    PNGConfig config;
+
+    // Default configuration
+    config.testFeature = UNKNOWN;
+    config.size = 32;
+    config.background = NO_BACKGROUND;
+    config.transparency = NO_TRANSPARENT;
+    config.gamma = 1.0;
+    config.filtering = 0;
+    config.palette = PALETTE_CHUNK;
+    config.significant_bits = 0;
+    config.histogram_colors = 0;
+    config.ppu_x = 0;
+    config.ppu_y = 0;
+    config.unit_specifier = 0;
+    config.text = NO_TEXT;
+    config.chunk_ordering = 0;
+    config.compression = 0;
+    config.interlace = SPNG_INTERLACE_NONE;
+    config.colorType = SPNG_COLOR_TYPE_TRUECOLOR;
+    config.bitDepth = 8;
+    config.time.day = 0;
+    config.time.month = 0;
+    config.time.year = 0;
+    config.time.hour = 0;
+    config.time.minute = 0;
+    config.time.second = 0;
+
+
+    char parameter[3] = {fileName[1], fileName[2], '\0'};
+
+    switch (fileName[0])
+    {
+    case 's': 
+        // Odd sizes: from 1 to 9 and from 32 to 40
+        config.testFeature = SIZE;
+        config.size = atoi(parameter);
+        break;
+    
+    case 'b': 
+        // Background colors:
+        // a: no background, b : black, g : gray, w : white, y : yellow
+        config.testFeature = BACKGROUND;
+        config.background = getBackground(fileName[1]);
+        break;
+    
+    case 't':
+        // Transparency:
+        config.testFeature = TRANSPARENCY;
+
+        if (fileName[1] == 'b') {
+            config.transparency = TRANSPARENT;
+            config.background = getBackground(fileName[2]);
+        }
+        else if (strcmp(parameter, "p0") == 0) {
+            config.transparency = NO_TRANSPARENT;
+        }
+        else if (strcmp(parameter, "p1") == 0) {
+            config.transparency = TRANSPARENT;
+            config.background = NO_BACKGROUND;
+        }
+        else if(strcmp(parameter, "m3") == 0) {
+            config.transparency = TRANSPARENT;
+        }
+        break;
+
+    case 'g':
+        // Gamma: 0.35, 0.45, 0.55, 0.70, 1.00, 2.50
+        config.testFeature = GAMMA;
+        config.gamma = atof(parameter) / 10;
+        if (config.gamma <= 0.5)
+            config.gamma += 0.05;
+        break;
+
+    case 'f':
+        // Filtering: 0, 1, 2, 3, 4
+        config.testFeature = FILTERING;
+        config.filtering = atoi(parameter);
+        if (config.filtering == 99)
+            config.filtering = 0;
+        break;
+
+    case 'p':
+        // Palette: 0, 1, 2
+        config.testFeature = PALETTE;
+        if (strcmp(parameter, "p0") == 0)
+            config.palette = PALETTE_CHUNK;
+        else if (strcmp(parameter, "s1") == 0)
+            config.palette = SUGGESTED_PALETTE_1_BYTE;
+        else if (strcmp(parameter, "s2") == 0)
+            config.palette = SUGGESTED_PALETTE_2_BYTE;
+        break;
+
+    case 'c':
+        // Chunks: THIS IS A MESS
+        if (fileName[1] == 's') {
+            config.testFeature = SIGNIFICANT_BITS;
+            config.significant_bits = fileName[2] - '0';
+        }
+        else if (fileName[1] == 'h') {
+            config.testFeature = HISTOGRAM;
+            if (fileName[2] == '1') {
+                config.histogram_colors = 15;
+            }
+            else {
+                config.histogram_colors = 256;
+            }
+        }
+        else if (fileName[1] == 'd') {
+            config.testFeature = PHYSICAL_PIXELS;
+            switch (fileName[2])
+            {
+            case 'f':
+                config.ppu_x = 8;
+                config.ppu_y = 32;
+                break;
+            case 'h':
+                config.ppu_x = 32;
+                config.ppu_y = 8;
+                break;
+            case 's':
+                config.ppu_x = 8;
+                config.ppu_y = 8;
+                break;
+            case 'u':
+                config.ppu_x = rand() % 1000;
+                config.ppu_y = rand() % 1000;
+                config.unit_specifier = rand() % 2;
+                break;
+            default:
+                break;
+            }
+        }
+        else if (fileName[1] == 't') {
+            config.testFeature = TEXT;
+            switch (fileName[2])
+            {
+                case '0':
+                    config.text = NO_TEXT;
+                    break;
+                case '1':
+                    config.text = TEXT_CHUNK;
+                    break;
+                case 'z':
+                    config.text = COMPRESSED_TEXT;
+                    break;
+                case 'e':
+                    config.text = INTERNATIONAL_TEXT_ENGLISH;
+                    break;
+                case 'f':
+                    config.text = INTERNATIONAL_TEXT_FINNISH;
+                    break;
+                case 'g':
+                    config.text = INTERNATIONAL_TEXT_GREEK;
+                    break;
+                case 'h':
+                    config.text = INTERNATIONAL_TEXT_HINDI;
+                    break;
+                case 'j':
+                    config.text = INTERNATIONAL_TEXT_JAPANESE;
+                    break;
+                default:
+                    config.text = NO_TEXT;
+                    break;
+            }
+        }
+        else if (fileName[1] == 'm') {
+            config.testFeature = TIME;
+            if (fileName[2] == '7') {
+                config.time.day = 1;
+                config.time.month = 1;
+                config.time.year = 1970;
+            }
+            else if (fileName[2] == '9') {
+                config.time.day = 31;
+                config.time.month = 12;
+                config.time.year = 1999;
+            }
+            else if (fileName[2] == '0') {
+                config.time.day = 1;
+                config.time.month = 1;
+                config.time.year = 2000;
+            }
+        }
+        break;
+
+    case 'o':
+        // chuck ordering
+        config.testFeature = CHUNK_ORDERING;
+        config.chunk_ordering = fileName[2] - '0';
+        break;
+
+    case 'z':
+        // Compression: 0, 1, 2, 3, 4
+        config.testFeature = COMPRESSION;
+        config.compression = atoi(parameter);
+        break;
+
+    case 'x':
+        // Corrupted: 0, 1, 2, 3, 4
+        config.testFeature = CORRUPTED;
+        break;
+
+    case 'e':
+        // EXIF
+        config.testFeature = EXIF;
+        break;
+
+    default:
+        break;
+    }
+    
+    // Determine interlacing (fourth character)
+    char interlacing = fileName[3];
+    config.interlace = (interlacing == 'i') ? SPNG_INTERLACE_ADAM7 : SPNG_INTERLACE_NONE;
+
+    // Extract color type (4 and 5 characters)
+    // 4 character is the color type code
+    // 5 character is the color type description
+    char colorTypeCode[3] = {fileName[4], '\0'};
+    config.colorType = atoi(colorTypeCode);
+
+    // Extract bit depth (seventh character)
+    char bitDepthCode[3] = {fileName[6], fileName[7], '\0'};
+    config.bitDepth = atoi(bitDepthCode);
+
+    return config;
+}
+
+enum spng_format get_fmt_from_config(const PNGConfig *config) {
+    // Determine the format based on color type and bit depth
+    if (config->colorType == SPNG_COLOR_TYPE_GRAYSCALE && config->bitDepth == 8)
+        return SPNG_FMT_G8;
+    else if (config->colorType == SPNG_COLOR_TYPE_GRAYSCALE_ALPHA){
+        if (config->bitDepth == 8)
+            return SPNG_FMT_GA8;
+        else
+            return SPNG_FMT_GA16;
+    }
+    else if (config->colorType == SPNG_COLOR_TYPE_TRUECOLOR && config->bitDepth == 8)
+        return SPNG_FMT_RGB8;
+    else if (config->colorType == SPNG_COLOR_TYPE_TRUECOLOR_ALPHA){
+        if (config->bitDepth == 8)
+            return SPNG_FMT_RGBA8;
+        else
+            return SPNG_FMT_RGBA16;
+    }
+    else if (config->colorType == SPNG_COLOR_TYPE_INDEXED)
+        return SPNG_FMT_PNG;
+    else
+        return SPNG_FMT_RAW;
+}
+
+enum spng_decode_flags get_decode_flags_from_config(const PNGConfig *config) {
+    int flags = 0;
+    if (config->testFeature == TRANSPARENCY)
+        flags |= SPNG_DECODE_TRNS;
+    if (config->testFeature == GAMMA)
+        flags |= SPNG_DECODE_GAMMA;
+
+    if (config->testFeature == SIGNIFICANT_BITS) {
+        flags |= SPNG_DECODE_USE_SBIT;  // Enable using the sBIT chunk during decoding
+    }
+    return flags;
+}
+
+void getFileName(const char *path, char *output) {
+    const char *lastSlash = strrchr(path, '/'); // For UNIX-like paths
+    if (!lastSlash) {
+        lastSlash = strrchr(path, '\\'); // For Windows paths
+    }
+    const char *fileName = lastSlash ? lastSlash + 1 : path; // Start after the slash
+    const char *dot = strrchr(fileName, '.'); // Find the last dot
+    const char *underscore = strrchr(fileName, '_'); // Find the last underscore
+    const char *end = underscore ? underscore : (dot ? dot : fileName + strlen(fileName)); // Choose the last underscore or dot
+    size_t length = (size_t)(end - fileName); // Calculate the length to copy
+
+    strncpy(output, fileName, length); // Copy the filename part
+    output[length] = '\0'; // Null-terminate the string
+}
+
 /// @brief Fuzz function for spng_write
 /// @param data - data to write
 /// @param size - size of data
 /// @return - 0 on success, 1 on failure
-int fuzz_spng_write(const uint8_t* data, size_t size)
+int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config)
 {
     // Initialization
     int fn_ret;
@@ -529,38 +926,151 @@ int fuzz_spng_write(const uint8_t* data, size_t size)
     size_t png_size = 0;
 
     struct spng_ihdr ihdr;
+    ihdr.width = config.size;
+    ihdr.height = config.size;
+    ihdr.bit_depth = config.bitDepth;
+    ihdr.color_type = config.colorType;
+    ihdr.compression_method = config.compression;
+    ihdr.filter_method = config.filtering;
+    ihdr.interlace_method = config.interlace;
+
     struct spng_plte plte;
+    plte.n_entries = rand() % 256;
+    for (int i = 0; i < plte.n_entries; i++) {
+        plte.entries[i].red = rand() % 256;
+        plte.entries[i].green = rand() % 256;
+        plte.entries[i].blue = rand() % 256;
+        plte.entries[i].alpha = rand() % 256;
+    }
+
     struct spng_trns trns;
+    trns.gray = rand() % 65536;
+    trns.red = rand() % 65536;
+    trns.green = rand() % 65536;
+    trns.blue = rand() % 65536;
+    trns.n_type3_entries = rand() % 256;
+    for (int i = 0; i < trns.n_type3_entries; i++) {
+        trns.type3_alpha[i] = rand() % 256;
+    }
+
     struct spng_chrm chrm;
+    // random double values
+    chrm.white_point_x = rand() % 65536 / 1000.0;
+    chrm.white_point_y = rand() % 65536 / 1000.0;
+    chrm.red_x = rand() % 65536 / 1000.0;
+    chrm.red_y = rand() % 65536 / 1000.0;
+    chrm.green_x = rand() % 65536 / 1000.0;
+    chrm.green_y = rand() % 65536 / 1000.0;
+    chrm.blue_x = rand() % 65536 / 1000.0;
+    chrm.blue_y = rand() % 65536 / 1000.0;
+
     struct spng_chrm_int chrm_int;
-    double gama = 0.45455;
-    uint32_t gama_int = 45455;
+    // random uint32_t values
+    chrm_int.white_point_x = rand() % 65536;
+    chrm_int.white_point_y = rand() % 65536;
+    chrm_int.red_x = rand() % 65536;
+    chrm_int.red_y = rand() % 65536;
+    chrm_int.green_x = rand() % 65536;
+    chrm_int.green_y = rand() % 65536;
+    chrm_int.blue_x = rand() % 65536;
+    chrm_int.blue_y = rand() % 65536;
+
+    double gama;
+    uint32_t gama_int;
+    if (config.testFeature == GAMMA) {
+        gama = config.gamma;
+        gama_int = (uint32_t)(config.gamma * 100);
+    }
+    else {
+        gama = rand() % 65536 / 1000.0;
+        gama_int = rand() % 65536;
+    }
+
     struct spng_iccp iccp;
+    iccp.profile = (uint8_t*)data;
+    iccp.profile_len = size;
+
     struct spng_sbit sbit;
-    uint8_t srgb_rendering_intent = 1;
+    sbit.grayscale_bits = config.significant_bits;
+    sbit.red_bits = config.significant_bits;
+    sbit.green_bits = config.significant_bits;
+    sbit.blue_bits = config.significant_bits;
+    sbit.alpha_bits = config.significant_bits;
+    
+    uint8_t srgb_rendering_intent = rand() % 4;
     struct spng_text text[4] = {0};
     struct spng_bkgd bkgd;
+    if (config.background == GRAY){
+        bkgd.gray = rand() % 256;
+    }
+    else if (config.background == BLACK){
+        bkgd.red = 0;
+        bkgd.green = 0;
+        bkgd.blue = 0;
+    }
+    else if (config.background == WHITE){
+        bkgd.red = 255;
+        bkgd.green = 255;
+        bkgd.blue = 255;
+    }
+    else if (config.background == YELLOW){
+        bkgd.red = 255;
+        bkgd.green = 255;
+        bkgd.blue = 0;
+    }
+
     struct spng_hist hist;
+    if (config.testFeature == HISTOGRAM && config.histogram_colors == 15) {
+        for (int i = 0; i < 15; i++) {
+            hist.frequency[i] = rand() % 65536;
+        }
+        for (int i = 15; i < 256; i++) {
+            hist.frequency[i] = 0;
+        }
+    } else {
+        for (int i = 0; i < 256; i++) {
+            hist.frequency[i] = rand() % 65536;
+        }
+    }
+
     struct spng_phys phys;
+    if(config.testFeature == PHYSICAL_PIXELS){
+        phys.ppu_x = config.ppu_x;
+        phys.ppu_y = config.ppu_y;
+        phys.unit_specifier = config.unit_specifier;
+    }
+    else{
+        phys.ppu_x = rand() % 1000;
+        phys.ppu_y = rand() % 1000;
+        phys.unit_specifier = rand() % 2;
+    }
+
     struct spng_splt splt[4] = {0};
     struct spng_time time;
+    if(config.testFeature == TIME){
+        time.year = config.time.year;
+        time.month = config.time.month;
+        time.day = config.time.day;
+    }
+    else{
+        time.year = rand() % 65536;
+        time.month = rand() % 13;
+        time.day = rand() % 32;
+    }
+    time.hour = rand() % 24;
+    time.minute = rand() % 60;
+    time.second = rand() % 60;
+
     struct spng_unknown_chunk chunks[4] = {0};
     uint32_t n_text = 4, n_splt = 4, n_chunks = 4;
 
     struct spng_offs offs;
     struct spng_exif exif;
 
+
     struct buf_state state;
     state.data = NULL;
     state.bytes_left = SIZE_MAX;
-
-    // Initialize enums from spng.h
-    enum spng_format fmt_flags[] = {
-        SPNG_FMT_RGBA8, SPNG_FMT_RGBA16, SPNG_FMT_RGB8,
-        SPNG_FMT_GA8, SPNG_FMT_GA16, SPNG_FMT_G8,
-        SPNG_FMT_PNG, SPNG_FMT_RAW
-    };
-    int TOTAL_TMP_FLAGS = sizeof(fmt_flags) / sizeof(enum spng_format);
 
     enum spng_option options_list[] = {
         SPNG_KEEP_UNKNOWN_CHUNKS, // true, false
@@ -582,8 +1092,7 @@ int fuzz_spng_write(const uint8_t* data, size_t size)
     int stream = rand() % 2;
     int get_buffer = rand() % 2;
     int progressive = rand() % 2;
-    int fmt = fmt_flags[rand() % TOTAL_TMP_FLAGS];
-    int flags = rand() % 2;
+    int fmt = get_fmt_from_config(&config);
 
     int num_options = rand() % TOTAL_OPTIONS;
     int chosen_options[num_options];
@@ -595,7 +1104,6 @@ int fuzz_spng_write(const uint8_t* data, size_t size)
     printf("get_buffer: %d\n", get_buffer);
     printf("progressive: %d\n", progressive);
     printf("fmt: %d\n", fmt);
-    printf("flags: %d\n", flags);
     printf("num_options: %d\n", num_options);
 
     for(int i = 0; i < num_options; i++){
@@ -651,7 +1159,10 @@ int fuzz_spng_write(const uint8_t* data, size_t size)
     test(spng_set_time(ctx, &time));
     test(spng_set_unknown_chunks(ctx, chunks, n_chunks));
     test(spng_set_offs(ctx, &offs));
-    test(spng_set_exif(ctx, &exif));
+
+    if (config.testFeature == EXIF) {
+        test(spng_set_exif(ctx, &exif));
+    }
 
     // Test colorspace
     switch(ihdr.color_type)
