@@ -34,7 +34,7 @@ afl-fuzz: $(BUILD_DIR)/decode_dev_zero
 	afl-fuzz -i input_dir -o output_dir $(BUILD_DIR)/decode_dev_zero @@
 
 
-
+	
 
 libspng/build/Makefile:
 	$(CMAKE) -B libspng/build -S libspng
@@ -44,7 +44,7 @@ libspng: libspng/build/libspng.so
 libspng/build/libspng.so: libspng/build/Makefile
 	$(MAKE) -C libspng/build
 
-fuzz: libspng/build/libspng.so fuzz/test_fuzzer_descriptor.fuzz fuzz/decode_dev_zero.fuzz fuzz/simple_decode_dev_zero.fuzz fuzz/decode_encode.fuzz
+fuzz: libspng/build/libspng.so fuzz/test_fuzzer_descriptor.fuzz fuzz/decode_dev_zero.fuzz fuzz/simple_decode_dev_zero.fuzz fuzz/decode_encode_file.fuzz fuzz/generic_test.fuzz
 
 # Maybe try with some fsanitize options: https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html
 fuzz/%.fuzz: fuzz/%.c libspng/build/libspng.so

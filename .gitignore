@@ -53,3 +53,5 @@ dkms.conf
 # Fuzzing executables, files, inputs, and outputs
 *.fuzz
 zzuf-0.15/
+
+./output/radamsa/*
