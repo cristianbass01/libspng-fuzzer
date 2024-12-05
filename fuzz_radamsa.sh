@@ -23,7 +23,7 @@ rm -f $SEGM_FAULT_LOG_DIR/*
 # Initialize mutation count
 COUNTER=0
 SEED_NUMBER=0
-MUTATIONS_PER_SEED_FILE=10  # Number of mutations per seed file
+MUTATIONS_PER_SEED_FILE=100  # Number of mutations per seed file
 COUNTER_ERRORS=0
 COUNTER_SEG_FAULTS=0
 

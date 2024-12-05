@@ -7,9 +7,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-// 0 for random read or write, 
-// 1 for always read, 
-// 2 for always write
+// 0 for always read, 
+// 1 for always write
+// 2 for random read or write, 
 #define TEST_TYPE 0 
 
 #define test(fn)                                                       \
@@ -172,20 +172,18 @@ int main(int argc, char **argv)
     get_file_code(argv[1], fileName);
     printf("File name: %s\n", fileName);
 
-#if TEST_TYPE == 0 // Random
+#if TEST_TYPE == 0 // Specific read
+    success = fuzz_spng_read((const uint8_t *)buf, siz_buf);
+#elif TEST_TYPE == 1 // Specific write
+    PNGConfig config = getPNGConfig(fileName);
+    success = fuzz_spng_write((const uint8_t *)buf, siz_buf, config);
+#else // Random read or write
     if (rand() % 2 == 0)
         success = fuzz_spng_read((const uint8_t *)buf, siz_buf);
     else{
         PNGConfig config = get_PNGConfig(fileName);
         success = fuzz_spng_write((const uint8_t *)buf, siz_buf, config);
     }
-
-#elif TEST_TYPE == 1 // Specific read
-    success = fuzz_spng_read((const uint8_t *)buf, siz_buf);
-#else // Specific write
-    
-    PNGConfig config = getPNGConfig(fileName);
-    success = fuzz_spng_write((const uint8_t *)buf, siz_buf, config);
 #endif
 
     free(buf);
