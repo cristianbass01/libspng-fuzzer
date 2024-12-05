@@ -53,3 +53,8 @@ dkms.conf
 # Fuzzing executables, files, inputs, and outputs
 *.fuzz
 zzuf-0.15/
+
+# AFL++ builds
+afl_build/
+afl_output_dir/
+corpus/
