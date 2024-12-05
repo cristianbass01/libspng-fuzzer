@@ -23,9 +23,11 @@ mkdir -p $SEGM_FAULT_LOG_DIR
 # Initialize mutation count
 COUNTER=0
 SEED_NUMBER=0
-MUTATIONS_PER_SEED_FILE=10  # Number of mutations per seed file
+MUTATIONS_PER_SEED_FILE=1000  # Number of mutations per seed file
 COUNTER_ERRORS=0
 COUNTER_SEG_FAULTS=0
+
+START_TIME=$(date +%s)
 
 # Infinite loop for continuous fuzzing
 while true; do
@@ -96,7 +98,7 @@ while true; do
             fi
 
             # Print the current mutation count on the same line
-            echo -ne "Counter $COUNTER - Mutating $SEED_NAME - Error count $COUNTER_ERRORS - Segmentation fault count $COUNTER_SEG_FAULTS\r"
+            echo -ne "Counter $COUNTER - Mutating $SEED_NAME - Error count $COUNTER_ERRORS - Segmentation fault count $COUNTER_SEG_FAULTS - time elapsed: $(( $(date +%s) - $START_TIME ))\r"
 
             
         done  # Inner for loop for all mutated files

@@ -308,7 +308,7 @@ void choose_random_options(enum spng_option options_list[], int TOTAL_OPTIONS, i
             break;
         case SPNG_FILTER_CHOICE:
             int filter_choices[] = {SPNG_DISABLE_FILTERING, SPNG_FILTER_CHOICE_NONE, SPNG_FILTER_CHOICE_SUB, SPNG_FILTER_CHOICE_UP, SPNG_FILTER_CHOICE_AVG, SPNG_FILTER_CHOICE_PAETH, SPNG_FILTER_CHOICE_ALL};
-            chosen_values[i] = rand() % 7;
+            chosen_values[i] = filter_choices[rand() % 7];
             break;
         case SPNG_CHUNK_COUNT_LIMIT:
             chosen_values[i] = rand() % UINT32_MAX;
@@ -452,7 +452,7 @@ int fuzz_spng_read(const uint8_t* data, size_t size)
 
     if(fn_ret) goto err;
 
-    int width, height;
+    uint32_t width, height;
     test(spng_get_image_limits(ctx, &width, &height));
     test(spng_set_image_limits(ctx, 200000, 200000));
 
@@ -921,7 +921,7 @@ void get_file_code(const char *path, char *output) {
     const char *fileName = lastSlash ? lastSlash + 1 : path; // Start after the slash
     size_t length = strlen(fileName) < 8 ? strlen(fileName) : 8;
 
-    strncpy(output, fileName, length); // Copy the filename part
+    memcpy(output, fileName, length); // Copy the filename part
     output[length] = '\0'; // Null-terminate the string
 }
 
@@ -953,7 +953,7 @@ int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config)
 
     struct spng_plte plte;
     plte.n_entries = rand() % 256;
-    for (int i = 0; i < plte.n_entries; i++) {
+    for (uint32_t i = 0; i < plte.n_entries; i++) {
         plte.entries[i].red = rand() % 256;
         plte.entries[i].green = rand() % 256;
         plte.entries[i].blue = rand() % 256;
@@ -966,7 +966,7 @@ int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config)
     trns.green = rand() % 65536;
     trns.blue = rand() % 65536;
     trns.n_type3_entries = rand() % 256;
-    for (int i = 0; i < trns.n_type3_entries; i++) {
+    for (uint32_t i = 0; i < trns.n_type3_entries; i++) {
         trns.type3_alpha[i] = rand() % 256;
     }
 
@@ -1004,7 +1004,7 @@ int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config)
     }
 
     struct spng_iccp iccp;
-    iccp.profile = (uint8_t*)data;
+    iccp.profile = (char *)data;
     iccp.profile_len = size;
 
     struct spng_sbit sbit;
