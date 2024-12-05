@@ -149,7 +149,10 @@ int main(int argc, char **argv)
     siz_buf = lseek(fd, 0, SEEK_END);
     lseek(fd, 0, SEEK_SET);
 
-    if(siz_buf < 1) goto error;
+    if(siz_buf < 1) {
+        fprintf(stderr, "file is empty\n");
+        goto error;
+    }
 
     // allocate buffer
     buf = (char*)malloc(siz_buf);
@@ -197,7 +200,7 @@ error:
     if (fd != -1) 
         close(fd);
 
-    return 1;
+    return 0;
 }
 
 //////////////////////////
