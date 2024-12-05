@@ -1177,10 +1177,7 @@ int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config)
     test(spng_set_time(ctx, &time));
     test(spng_set_unknown_chunks(ctx, chunks, n_chunks));
     test(spng_set_offs(ctx, &offs));
-
-    if (config.testFeature == EXIF) {
-        test(spng_set_exif(ctx, &exif));
-    }
+    test(spng_set_exif(ctx, &exif));
 
     // Test colorspace
     switch(ihdr.color_type)
