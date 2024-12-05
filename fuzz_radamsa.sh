@@ -4,26 +4,26 @@
 SEED_DIR="./images"  # Directory with initial seed files (e.g., PNG files)
 EXECUTABLE="./fuzz/generic_test.fuzz"
 
+SAVE_ALL_LOGS=0  # Set to 1 to save all logs, including successful runs
+
 # Directories to save mutated files and crash logs
 RADAMSA_DIR="./output/radamsa"
 MUTATED_DIR="$RADAMSA_DIR/mutated"
 TMP_LOG_FILE="$RADAMSA_DIR/tmp_log.txt"
+LOG_FILE="$RADAMSA_DIR/logs.txt"
 ERROR_LOG_DIR="$RADAMSA_DIR/error_logs"
 SEGM_FAULT_LOG_DIR="$RADAMSA_DIR/seg_fault_logs"
+
+rm -rf $RADAMSA_DIR
 
 mkdir -p $MUTATED_DIR
 mkdir -p $ERROR_LOG_DIR
 mkdir -p $SEGM_FAULT_LOG_DIR
 
-rm -f $TMP_LOG_FILE
-rm -f $MUTATED_DIR/*
-rm -f $ERROR_LOG_DIR/*
-rm -f $SEGM_FAULT_LOG_DIR/*
-
 # Initialize mutation count
 COUNTER=0
 SEED_NUMBER=0
-MUTATIONS_PER_SEED_FILE=100  # Number of mutations per seed file
+MUTATIONS_PER_SEED_FILE=1000  # Number of mutations per seed file
 COUNTER_ERRORS=0
 COUNTER_SEG_FAULTS=0
 
@@ -45,9 +45,20 @@ while true; do
         for MUTATED_FILE in $MUTATED_DIR/*; do
             # Run the mutated file through the program that uses libspng
             # Capture the exit status of the program
-            $EXECUTABLE $MUTATED_FILE >> $TMP_LOG_FILE 2>&1
+            $EXECUTABLE $MUTATED_FILE > $TMP_LOG_FILE 2>&1
             EXIT_STATUS=$?
 
+            if [ $SAVE_ALL_LOGS -eq 1 ]; then
+                # Save all logs
+                echo "Seed number $SEED_NUMBER for seed file: $SEED_NAME!" >> $LOG_FILE
+                echo "Counter at: $COUNTER" >> $LOG_FILE
+                echo "Mutated File: $MUTATED_FILE" >> $LOG_FILE
+                echo "Exit Status: $EXIT_STATUS" >> $LOG_FILE
+                echo "Output:" >> $LOG_FILE
+                cat $TMP_LOG_FILE >> $LOG_FILE
+                echo "----------------------------------------------------" >> $LOG_FILE
+            fi
+            
             # Print the current mutation count on the same line
             COUNTER=$((COUNTER + 1))
             
@@ -87,8 +98,7 @@ while true; do
             # Print the current mutation count on the same line
             echo -ne "Counter $COUNTER - Mutating $SEED_NAME - Error count $COUNTER_ERRORS - Segmentation fault count $COUNTER_SEG_FAULTS\r"
 
-            # Add a line to separate the output for each log
-            echo "----------------------------------------------------\n" >> $TMP_LOG_FILE
+            
         done  # Inner for loop for all mutated files
         
         # Delete the mutated files to save space

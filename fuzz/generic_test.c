@@ -10,7 +10,7 @@
 // 0 for always read, 
 // 1 for always write
 // 2 for random read or write, 
-#define TEST_TYPE 0 
+#define TEST_TYPE 2
 
 #define test(fn)                                                       \
     printf("Testing %s... ", #fn);                                     \
