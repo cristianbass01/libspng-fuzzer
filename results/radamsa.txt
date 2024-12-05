@@ -1,0 +1,5 @@
+Without sanitizers:
+
+Counter 5154000 - Error count 54 - Segmentation fault count 0
+All errors where generated because the file was empty (so not a library problem)
+Time: 9 hours

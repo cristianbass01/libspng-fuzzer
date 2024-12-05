@@ -14,6 +14,7 @@ else
       cmake -B build -S .
       cd build
       make
+      sudo make install
       cd ..
       ;;
     radamsa)

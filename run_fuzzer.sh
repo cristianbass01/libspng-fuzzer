@@ -36,8 +36,13 @@ if [ ! -f $test_source ]; then
 fi
 
 # Build test
+if [ -z ${FUZZ_READ+x} ]; then
+        FUZZ_READ=1
+fi
+
 test_file="fuzz/$2.fuzz"
-make $test_file
+rm $test_file > /dev/null 2>&1 || true
+make CPPFLAGS="-DFUZZ_READ=$FUZZ_READ" $test_file
 if [ $? -ne 0 ]; then
     echo "Failed to build test"
     exit 1
@@ -61,10 +66,12 @@ zzuf)
     output_file="$output_dir/$2$((num_files+1)).out"
     
     echo "" > $output_file
-    for i in $(seq 1 $NUM_RUNS); do
-        command="zzuf ${opts[@]} -s $RANDOM $test_file"
+    START=$(cat /dev/random | head -c 4 | xxd -p)
+    START=$((16#$START))
+    for i in $(seq $START $((START + NUM_RUNS - 1))); do
+        command="zzuf ${opts[@]} -s $i $test_file"
         echo $command >> $output_file
-        LD_LIBRARY_PATH=libspng/build $command >> $output_file
+        LD_LIBRARY_PATH=libspng/build $command >> $output_file 2>&1
         echo "" >> $output_file
     done
     ;;
