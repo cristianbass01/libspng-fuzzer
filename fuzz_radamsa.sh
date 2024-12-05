@@ -2,7 +2,8 @@
 
 # Directory containing the initial seed files
 SEED_DIR="./images"  # Directory with initial seed files (e.g., PNG files)
-EXECUTABLE="./fuzz/generic_test.fuzz"
+EXECUTABLE="./fuzz/generic_test_asan.fuzz"
+echo "Using executable: $EXECUTABLE"
 
 SAVE_ALL_LOGS=0  # Set to 1 to save all logs, including successful runs
 

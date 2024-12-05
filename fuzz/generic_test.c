@@ -277,6 +277,7 @@ void choose_random_options(enum spng_option options_list[], int TOTAL_OPTIONS, i
     for(int i = 0; i < num_options; i++){
         chosen_options[i] = options_list[rand() % TOTAL_OPTIONS];
         int compression_levels[] = {0, 1, 2, 9};
+        int filter_choices[] = {SPNG_DISABLE_FILTERING, SPNG_FILTER_CHOICE_NONE, SPNG_FILTER_CHOICE_SUB, SPNG_FILTER_CHOICE_UP, SPNG_FILTER_CHOICE_AVG, SPNG_FILTER_CHOICE_PAETH, SPNG_FILTER_CHOICE_ALL};
         switch (chosen_options[i])
         {
         case SPNG_KEEP_UNKNOWN_CHUNKS:
@@ -307,7 +308,6 @@ void choose_random_options(enum spng_option options_list[], int TOTAL_OPTIONS, i
             chosen_values[i] = rand() % 5;
             break;
         case SPNG_FILTER_CHOICE:
-            int filter_choices[] = {SPNG_DISABLE_FILTERING, SPNG_FILTER_CHOICE_NONE, SPNG_FILTER_CHOICE_SUB, SPNG_FILTER_CHOICE_UP, SPNG_FILTER_CHOICE_AVG, SPNG_FILTER_CHOICE_PAETH, SPNG_FILTER_CHOICE_ALL};
             chosen_values[i] = filter_choices[rand() % 7];
             break;
         case SPNG_CHUNK_COUNT_LIMIT:
