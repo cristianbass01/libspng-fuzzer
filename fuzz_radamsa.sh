@@ -15,6 +15,11 @@ mkdir -p $MUTATED_DIR
 mkdir -p $ERROR_LOG_DIR
 mkdir -p $SEGM_FAULT_LOG_DIR
 
+rm -f $TMP_LOG_FILE
+rm -f $MUTATED_DIR/*
+rm -f $ERROR_LOG_DIR/*
+rm -f $SEGM_FAULT_LOG_DIR/*
+
 # Initialize mutation count
 COUNTER=0
 SEED_NUMBER=0
@@ -79,8 +84,11 @@ while true; do
                 cp $MUTATED_FILE $ERROR_LOG_DIR/crash_$COUNTER.png
             fi
 
+            # Print the current mutation count on the same line
             echo -ne "Counter $COUNTER - Mutating $SEED_NAME - Error count $COUNTER_ERRORS - Segmentation fault count $COUNTER_SEG_FAULTS\r"
 
+            # Add a line to separate the output for each log
+            echo "----------------------------------------------------\n" >> $TMP_LOG_FILE
         done  # Inner for loop for all mutated files
         
         # Delete the mutated files to save space

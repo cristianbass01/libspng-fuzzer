@@ -7,7 +7,10 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-//#define FUZZ_READ 1
+// 0 for random read or write, 
+// 1 for always read, 
+// 2 for always write
+#define TEST_TYPE 0 
 
 #define test(fn)                                                       \
     printf("Testing %s... ", #fn);                                     \
@@ -103,8 +106,8 @@ typedef struct {
 
 int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config);
 
-PNGConfig getPNGConfig(const char *fileName);
-void getFileName(const char *path, char *output);
+PNGConfig get_PNGConfig(const char *fileName);
+void get_file_code(const char *path, char *output);
 
 ////////////////////////////////////////
 // MAIN:
@@ -165,12 +168,22 @@ int main(int argc, char **argv)
 
     int success = 0;
 
-#if FUZZ_READ == 1
-    success = fuzz_spng_read((const uint8_t *)buf, siz_buf);
-#else
     char fileName[256];
-    getFileName(argv[1], fileName);
+    get_file_code(argv[1], fileName);
     printf("File name: %s\n", fileName);
+
+#if TEST_TYPE == 0 // Random
+    if (rand() % 2 == 0)
+        success = fuzz_spng_read((const uint8_t *)buf, siz_buf);
+    else{
+        PNGConfig config = get_PNGConfig(fileName);
+        success = fuzz_spng_write((const uint8_t *)buf, siz_buf, config);
+    }
+
+#elif TEST_TYPE == 1 // Specific read
+    success = fuzz_spng_read((const uint8_t *)buf, siz_buf);
+#else // Specific write
+    
     PNGConfig config = getPNGConfig(fileName);
     success = fuzz_spng_write((const uint8_t *)buf, siz_buf, config);
 #endif
@@ -318,6 +331,8 @@ void choose_random_options(enum spng_option options_list[], int TOTAL_OPTIONS, i
 /// @return - 0 on success, 1 on failure
 int fuzz_spng_read(const uint8_t* data, size_t size)
 {
+    printf("Fuzzing spng_read...\n");
+
     // Initialization
     int fn_ret;
     unsigned char *img = NULL;
@@ -394,16 +409,17 @@ int fuzz_spng_read(const uint8_t* data, size_t size)
     choose_random_options(options_list, TOTAL_OPTIONS, num_options, chosen_options, chosen_values);
 
     // Print configuration
-    printf("stream: %d\n", stream);
-    printf("file_stream: %d\n", file_stream);
-    printf("discard: %d\n", discard);
-    printf("progressive: %d\n", progressive);
-    printf("fmt: %d\n", fmt);
-    printf("flags: %d\n", flags);
-    printf("num_options: %d\n", num_options);
+    printf("Configuration:\n");
+    printf(" - stream: %d\n", stream);
+    printf(" - file_stream: %d\n", file_stream);
+    printf(" - discard: %d\n", discard);
+    printf(" - progressive: %d\n", progressive);
+    printf(" - fmt: %d\n", fmt);
+    printf(" - flags: %d\n", flags);
+    printf(" - num_options: %d\n", num_options);
 
     for(int i = 0; i < num_options; i++){
-        printf("Option %d, Value %d\n", chosen_options[i], chosen_values[i]);
+        printf(" - Option %d, Value %d\n", chosen_options[i], chosen_values[i]);
     }
     
     // end Initialization
@@ -628,7 +644,7 @@ enum background getBackground(char background) {
 }
 
 // Function to derive a PNGConfig from the file name
-PNGConfig getPNGConfig(const char *fileName) {
+PNGConfig get_PNGConfig(const char *fileName) {
     PNGConfig config;
 
     // Default configuration
@@ -657,6 +673,7 @@ PNGConfig getPNGConfig(const char *fileName) {
     config.time.minute = 0;
     config.time.second = 0;
 
+    if(strlen(fileName) < 8) return config;
 
     char parameter[3] = {fileName[1], fileName[2], '\0'};
 
@@ -895,16 +912,13 @@ enum spng_decode_flags get_decode_flags_from_config(const PNGConfig *config) {
     return flags;
 }
 
-void getFileName(const char *path, char *output) {
+void get_file_code(const char *path, char *output) {
     const char *lastSlash = strrchr(path, '/'); // For UNIX-like paths
     if (!lastSlash) {
         lastSlash = strrchr(path, '\\'); // For Windows paths
     }
     const char *fileName = lastSlash ? lastSlash + 1 : path; // Start after the slash
-    const char *dot = strrchr(fileName, '.'); // Find the last dot
-    const char *underscore = strrchr(fileName, '_'); // Find the last underscore
-    const char *end = underscore ? underscore : (dot ? dot : fileName + strlen(fileName)); // Choose the last underscore or dot
-    size_t length = (size_t)(end - fileName); // Calculate the length to copy
+    size_t length = strlen(fileName) < 8 ? strlen(fileName) : 8;
 
     strncpy(output, fileName, length); // Copy the filename part
     output[length] = '\0'; // Null-terminate the string
@@ -916,6 +930,8 @@ void getFileName(const char *path, char *output) {
 /// @return - 0 on success, 1 on failure
 int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config)
 {
+    printf("Fuzzing spng_write...\n");
+
     // Initialization
     int fn_ret;
     unsigned char *img = NULL;
@@ -1100,14 +1116,15 @@ int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config)
     choose_random_options(options_list, TOTAL_OPTIONS, num_options, chosen_options, chosen_values);
 
     // Print configuration
-    printf("stream: %d\n", stream);
-    printf("get_buffer: %d\n", get_buffer);
-    printf("progressive: %d\n", progressive);
-    printf("fmt: %d\n", fmt);
-    printf("num_options: %d\n", num_options);
+    printf("Configuration:\n");
+    printf(" - stream: %d\n", stream);
+    printf(" - get_buffer: %d\n", get_buffer);
+    printf(" - progressive: %d\n", progressive);
+    printf(" - fmt: %d\n", fmt);
+    printf(" - num_options: %d\n", num_options);
 
     for(int i = 0; i < num_options; i++){
-        printf("Option %d, Value %d\n", chosen_options[i], chosen_values[i]);
+        printf(" - Option %d, Value %d\n", chosen_options[i], chosen_values[i]);
     }
     
     // end Initialization
