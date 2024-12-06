@@ -80,7 +80,8 @@ const char *color_type_str(enum spng_color_type color_type)
     }
 }
 
-int main(int argc, char **argv)
+//int main(int argc, char **argv)
+int main()
 {
     FILE *png;
     int ret = 0;
@@ -91,7 +92,8 @@ int main(int argc, char **argv)
 
     if (png == NULL)
     {
-        printf("error opening input file %s\n", argv[1]);
+        //printf("error opening input file %s\n", argv[1]);
+        printf("error opening input file\n");
         goto error;
     }
 

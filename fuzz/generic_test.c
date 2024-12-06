@@ -124,11 +124,12 @@ void get_file_code_afl(const char *path, char *output);
 
 int main(int argc, char **argv)
 {
-    int urandom = open("/dev/urandom", O_RDONLY);
+    
  
-
     // Possibly we need to delete this part because the seed is set to the value at middle of the buffer
     /*
+    int urandom = open("/dev/urandom", O_RDONLY);
+    
     unsigned int seed;
     if(read(urandom, &seed, sizeof(seed)) != sizeof(seed))
     {
@@ -947,7 +948,7 @@ void get_file_code_afl(const char *path, char *output) {
 
     int comma_counter = 0;
 
-    size_t intermediate_length = strlen(fileName);
+    //size_t intermediate_length = strlen(fileName);
 
     while(comma_counter < 3 && *fileName!='\0'){ //Reaching last comma of afl filenames
         if(*fileName == ','){
