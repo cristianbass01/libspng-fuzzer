@@ -3,3 +3,7 @@ Without sanitizers:
 Counter 5154000 - Error count 54 - Segmentation fault count 0
 All errors where generated because the file was empty (so not a library problem)
 Time: 9 hours
+
+
+Using executable: ./fuzz/generic_test_asan.fuzz
+^Cunter 3224426 - Mutating f99n0g04 - Errors 0 - Segm. faults 0 - time: 62345

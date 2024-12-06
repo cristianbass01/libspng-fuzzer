@@ -14,7 +14,7 @@ BUILD_DIR=build
 LIBSPNG_LIB=$(BUILD_DIR)/libspng.a
 
 # Flags
-CFLAGS= -Wall -Wextra -Werror -fno-omit-frame-pointer -I $(INCLUDE_DIR) -L $(BUILD_LIBSPNG_DIR) -lspng -g $(CPPFLAGS) 
+CFLAGS= -Wall -Wextra -Werror -fno-omit-frame-pointer -I $(INCLUDE_DIR) -L $(BUILD_LIBSPNG_DIR) -lspng -g $(CPPFLAGS)
 ASANFLAGS=-fsanitize=address 
 MSANFLAGS=-fsanitize=memory -fPIE -pie -g
 

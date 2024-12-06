@@ -1,8 +1,14 @@
 #!/bin/bash
 
+if [ -z "$1" ]; then
+    echo "Usage: $0 <executable>"
+    exit 1
+fi
+
+EXECUTABLE="$1"
+
 # Directory containing the initial seed files
 SEED_DIR="./images"  # Directory with initial seed files (e.g., PNG files)
-EXECUTABLE="./fuzz/generic_test_asan.fuzz"
 echo "Using executable: $EXECUTABLE"
 
 SAVE_ALL_LOGS=0  # Set to 1 to save all logs, including successful runs
@@ -24,7 +30,7 @@ mkdir -p $SEGM_FAULT_LOG_DIR
 # Initialize mutation count
 COUNTER=0
 SEED_NUMBER=0
-MUTATIONS_PER_SEED_FILE=1000  # Number of mutations per seed file
+MUTATIONS_PER_SEED_FILE=10  # Number of mutations per seed file
 COUNTER_ERRORS=0
 COUNTER_SEG_FAULTS=0
 
@@ -48,6 +54,7 @@ while true; do
         for MUTATED_FILE in $MUTATED_DIR/*; do
             # Run the mutated file through the program that uses libspng
             # Capture the exit status of the program
+            #strace -e trace=write $EXECUTABLE $MUTATED_FILE > $TMP_LOG_FILE 2>&1
             $EXECUTABLE $MUTATED_FILE > $TMP_LOG_FILE 2>&1
             EXIT_STATUS=$?
 
@@ -99,8 +106,8 @@ while true; do
             fi
 
             # Print the current mutation count on the same line
-            echo -ne "Counter $COUNTER - Mutating $SEED_NAME - Error count $COUNTER_ERRORS - Segmentation fault count $COUNTER_SEG_FAULTS - time elapsed: $(( $(date +%s) - $START_TIME ))\r"
-
+            echo -ne "Counter $COUNTER - Mutating $SEED_NAME - Errors $COUNTER_ERRORS - Segm. faults $COUNTER_SEG_FAULTS - time: $(( $(date +%s) - $START_TIME ))\r"
+            
             
         done  # Inner for loop for all mutated files
         
