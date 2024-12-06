@@ -54,4 +54,8 @@ dkms.conf
 *.fuzz
 zzuf-0.15/
 
+# AFL++ builds
+afl_build/
+afl_output_dir/
+corpus/
 */output/radamsa/*

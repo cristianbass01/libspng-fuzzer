@@ -52,22 +52,15 @@ libspng/build/libspng.so: libspng/build/Makefile
 
 fuzz: libspng/build/libspng.so fuzz/test_fuzzer_descriptor.fuzz fuzz/decode_dev_zero.fuzz fuzz/simple_decode_dev_zero.fuzz fuzz/decode_encode_file.fuzz fuzz/generic_test.fuzz
 
-
-# GENERIC FUZZER BUILD
-generic_test: libspng/build/libspng.so
-	$(CC) -o fuzz/generic_test.fuzz fuzz/generic_test.c $(CFLAGS)
-
-generic_test_asan: libspng/build/libspng.so
-	$(CLANG) -o fuzz/generic_test_asan.fuzz fuzz/generic_test.c $(CFLAGS) $(ASANFLAGS)
-
-generic_test_msan: libspng/build/libspng.so
-	$(CLANG) -o fuzz/generic_test_msan.fuzz fuzz/generic_test.c $(CFLAGS) $(MSANFLAGS)
-
-
 # FUZZER BUILD
-# Maybe try with some fsanitize options: https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html
 fuzz/%.fuzz: fuzz/%.c libspng/build/libspng.so
 	$(CC) -o $@ $< $(CFLAGS)
+
+fuzz/%_asan.fuzz: fuzz/%.c libspng/build/libspng.so
+	$(CLANG) -o $@ $< $(CFLAGS) $(ASANFLAGS)
+
+fuzz/%_msan.fuzz: fuzz/%.c libspng/build/libspng.so
+	$(CLANG) -o $@ $< $(CFLAGS) $(MSANFLAGS)
 
 
 # Usage: if you want to run the executable <FILE>.fuzz file corresponding
