@@ -35,45 +35,100 @@ if [ ! -f $test_source ]; then
     exit 1
 fi
 
+# Sanitizer
+if [ -z ${SANITIZER+x} ]; then
+        SANITIZER=""
+fi
+
 # Build test
 if [ -z ${FUZZ_READ+x} ]; then
         FUZZ_READ=1
 fi
 
-test_file="fuzz/$2.fuzz"
-rm $test_file > /dev/null 2>&1 || true
-make CPPFLAGS="-DFUZZ_READ=$FUZZ_READ" $test_file
+if [ -z ${TEST_TYPE+x} ]; then
+        TEST_TYPE=2
+fi
+
+case "$SANITIZER" in
+asan)
+    test_file="fuzz/${2}_asan.fuzz"
+    ;;
+msan)
+    test_file="fuzz/${2}_msan.fuzz"
+    ;;
+*)
+    test_file="fuzz/${2}.fuzz"
+    ;;
+esac
+
+# rm $test_file > /dev/null 2>&1 || true
+touch "fuzz/${2}.c"
+make CPPFLAGS="-DFUZZ_READ=$FUZZ_READ -DTEST_TYPE=$TEST_TYPE" $test_file
 if [ $? -ne 0 ]; then
     echo "Failed to build test"
     exit 1
 fi
 
 # Run fuzzer
+
+if [ -z ${SINGLE_IMAGE+x} ]; then
+        SINGLE_IMAGE=0
+fi
+
+
 mkdir output > /dev/null 2>&1 || true
 # !!! Add or change fuzzer cases here
 case "$1" in
 zzuf)
+    echo "Fuzzing with zzuf..."
+    output_dir="output/zzuf"
+    mkdir $output_dir > /dev/null 2>&1 || true
+
     # Set by prepending NUM_RUNS to the script
     if [ -z ${NUM_RUNS+x} ]; then
         NUM_RUNS=1
     fi
 
-    output_dir="output/zzuf"
-    mkdir $output_dir > /dev/null 2>&1 || true
-    echo "Fuzzing with zzuf..."
-
     num_files=$(ls -la $output_dir | grep -E "$2.*.out" | wc -l)
     output_file="$output_dir/$2$((num_files+1)).out"
-    
     echo "" > $output_file
+
     START=$(cat /dev/random | head -c 4 | xxd -p)
     START=$((16#$START))
-    for i in $(seq $START $((START + NUM_RUNS - 1))); do
-        command="zzuf ${opts[@]} -s $i $test_file"
-        echo $command >> $output_file
-        LD_LIBRARY_PATH=libspng/build $command >> $output_file 2>&1
-        echo "" >> $output_file
-    done
+
+    if [ $SINGLE_IMAGE = 1 ]; then
+        for i in $(seq $START $((START + NUM_RUNS - 1))); do
+            command="zzuf ${opts[@]} -s $i $test_file"
+            echo $command >> $output_file
+            LD_LIBRARY_PATH=libspng/build $command >> $output_file 2>&1
+            echo "" >> $output_file
+        done
+    else
+        IMAGES_DIR="images/"
+        total_images=$(ls -la $IMAGES_DIR | grep -E ".*.png" | wc -l)
+
+        ind=1
+        for img_path in $IMAGES_DIR*; do
+            ind=$((ind+1))
+
+            img_name=$(basename $img_path)
+            for i in $(seq $START $((START + NUM_RUNS - 1))); do
+                echo -ne "                                                                       \r"
+                echo -ne "Image $ind/$total_images, Run $((i - START))/$NUM_RUNS\r"
+                command="zzuf ${opts[@]} -s $i $test_file $img_path"
+                if [ $SANITIZER = "valgrind" ]; then
+                    OUTPUT=$(LD_LIBRARY_PATH=libspng/build valgrind --leak-check=full --error-exitcode=1 --trace-children=yes --show-leak-kinds=all $command 2>&1)
+                else
+                    OUTPUT=$(LD_LIBRARY_PATH=libspng/build $command >> $output_file 2>&1)
+                fi
+                # if [ $? -ne 0 ]; then
+                # echo "exit code $?" >> $output_file
+                echo $command >> $output_file
+                echo $OUTPUT >> $output_file
+                # fi
+            done    
+        done
+    fi
     ;;
 afl)
     echo "Fuzzing with AFL..."
