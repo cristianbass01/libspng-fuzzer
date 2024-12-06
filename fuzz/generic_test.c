@@ -12,6 +12,10 @@
 // 2 for random read or write, 
 #define TEST_TYPE 2
 
+// 0 uses normal filename parsing function
+// 1 uses AFL filename parsing function
+#define AFL_MODE 0
+
 #define test(fn)                                                       \
     printf("Testing %s... ", #fn);                                     \
     fn_ret = fn;                                                       \
@@ -108,7 +112,7 @@ int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config);
 
 PNGConfig get_PNGConfig(const char *fileName);
 void get_file_code(const char *path, char *output);
-
+void get_file_code_afl(const char *path, char *output);
 ////////////////////////////////////////
 // MAIN:
 ////////////////////////////////////////
@@ -116,6 +120,10 @@ void get_file_code(const char *path, char *output);
 int main(int argc, char **argv)
 {
     int urandom = open("/dev/urandom", O_RDONLY);
+ 
+
+    // Possibly we need to delete this part because the seed is set to the value at middle of the buffer
+    /*
     unsigned int seed;
     if(read(urandom, &seed, sizeof(seed)) != sizeof(seed))
     {
@@ -127,7 +135,7 @@ int main(int argc, char **argv)
         srand(seed);
     }
     close(urandom);
-
+    */
     char *buf = NULL;
     long siz_buf;
     int fd = -1;
@@ -169,10 +177,20 @@ int main(int argc, char **argv)
         goto error;
     }
 
-    int success = 0;
+    unsigned int seed;
 
+    // Setting seed to random value in the middle of the buffer
+    seed = (unsigned int) buf[siz_buf/2];
+    srand(seed);
+
+    int success = 0;
     char fileName[256];
+
+#if AFL_MODE == 1
+    get_file_code_afl(argv[1], fileName);
+#else
     get_file_code(argv[1], fileName);
+#endif
     printf("File name: %s\n", fileName);
 
 #if TEST_TYPE == 0 // Specific read
@@ -911,6 +929,33 @@ enum spng_decode_flags get_decode_flags_from_config(const PNGConfig *config) {
         flags |= SPNG_DECODE_USE_SBIT;  // Enable using the sBIT chunk during decoding
     }
     return flags;
+}
+
+void get_file_code_afl(const char *path, char *output) {
+    
+    printf("Reading file code from AFL path\n");
+    const char *lastSlash = strrchr(path, '/'); // For UNIX-like paths
+    if (!lastSlash) {
+        lastSlash = strrchr(path, '\\'); // For Windows paths
+    }
+    const char *fileName = lastSlash ? lastSlash + 1 : path; // Start after the slash
+
+    int comma_counter = 0;
+
+    size_t intermediate_length = strlen(fileName);
+
+    while(comma_counter < 3 && *fileName!='\0'){ //Reaching last comma of afl filenames
+        if(*fileName == ','){
+            comma_counter++;
+        }
+        fileName++;
+    }
+
+    fileName += 5; //skiping the "orig:" part of the string
+    size_t length = strlen(fileName) < 8 ? strlen(fileName) : 8;
+
+    memcpy(output, fileName, length); // Copy the filename part
+    output[length] = '\0'; // Null-terminate the string
 }
 
 void get_file_code(const char *path, char *output) {
