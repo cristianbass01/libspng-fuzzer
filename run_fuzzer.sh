@@ -62,6 +62,7 @@ msan)
 esac
 
 # rm $test_file > /dev/null 2>&1 || true
+make fuzz/in_out.fuzz
 touch "fuzz/${2}.c"
 make CPPFLAGS="-DFUZZ_READ=$FUZZ_READ -DTEST_TYPE=$TEST_TYPE" $test_file
 if [ $? -ne 0 ]; then
@@ -118,13 +119,17 @@ zzuf)
                 command="zzuf ${opts[@]} -s $i $test_file $img_path"
                 if [ "$SANITIZER" = "valgrind" ]; then
                     OUTPUT=$(LD_LIBRARY_PATH=libspng/build valgrind --leak-check=full --error-exitcode=1 --trace-children=yes --show-leak-kinds=all $command 2>&1)
+                elif [ "$SANITIZER" = "asan" ]; then
+                    zzuf ${opts[@]} -s $i fuzz/in_out.fuzz $img_path "${img_path}_TMP" > /dev/null 2>&1
+                    OUTPUT=$(LD_LIBRARY_PATH=libspng/build $test_file "${img_path}_TMP" 2>&1)
+                    rm "${img_path}_TMP"
                 else
                     OUTPUT=$(LD_LIBRARY_PATH=libspng/build $command 2>&1)
                 fi
-                if [ $? -ne 0 ]; then
-                    echo $command >> $output_file
-                    echo $OUTPUT >> $output_file
-                fi
+                # if [ $? -ne 0 ]; then
+                echo $command >> $output_file
+                echo $OUTPUT >> $output_file
+                # fi
             done    
         done
     fi
