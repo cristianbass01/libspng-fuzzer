@@ -1,8 +1,8 @@
 
 #!/bin/bash
 
-NUM_WORKERS=12
-RUNS_PER_IMAGE=5
+NUM_WORKERS=16
+RUNS_PER_IMAGE=10000
 PROGRAM_NAME="generic_test"
 
 # Array to store PIDs of background jobs
@@ -43,9 +43,9 @@ done
 
 for i in $(seq 1 "$NUM_WORKERS"); do
     if [ "$i" -eq 1 ]; then
-        time NUM_RUNS=$RUNS_PER_IMAGE SANITIZER=valgrind ./run_fuzzer.sh zzuf $PROGRAM_NAME -r 0.01 &
+        time NUM_RUNS=$RUNS_PER_IMAGE SANITIZER="" ./run_fuzzer.sh zzuf $PROGRAM_NAME -r 0.01 &
     else
-        NUM_RUNS=$RUNS_PER_IMAGE SANITIZER=valgrind ./run_fuzzer.sh zzuf $PROGRAM_NAME -r 0.01 > /dev/null 2>&1&
+        NUM_RUNS=$RUNS_PER_IMAGE SANITIZER="" ./run_fuzzer.sh zzuf $PROGRAM_NAME -r 0.01 > /dev/null 2>&1&
     fi
     sleep 1
     JOB_PIDS+=("$!")           # Store the PID of the background job

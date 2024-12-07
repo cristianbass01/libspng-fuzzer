@@ -116,16 +116,15 @@ zzuf)
                 echo -ne "                                                                       \r"
                 echo -ne "Image $ind/$total_images, Run $((i - START))/$NUM_RUNS\r"
                 command="zzuf ${opts[@]} -s $i $test_file $img_path"
-                if [ $SANITIZER = "valgrind" ]; then
+                if [ "$SANITIZER" = "valgrind" ]; then
                     OUTPUT=$(LD_LIBRARY_PATH=libspng/build valgrind --leak-check=full --error-exitcode=1 --trace-children=yes --show-leak-kinds=all $command 2>&1)
                 else
-                    OUTPUT=$(LD_LIBRARY_PATH=libspng/build $command >> $output_file 2>&1)
+                    OUTPUT=$(LD_LIBRARY_PATH=libspng/build $command 2>&1)
                 fi
-                # if [ $? -ne 0 ]; then
-                # echo "exit code $?" >> $output_file
-                echo $command >> $output_file
-                echo $OUTPUT >> $output_file
-                # fi
+                if [ $? -ne 0 ]; then
+                    echo $command >> $output_file
+                    echo $OUTPUT >> $output_file
+                fi
             done    
         done
     fi
