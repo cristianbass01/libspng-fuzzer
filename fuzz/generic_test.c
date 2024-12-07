@@ -409,7 +409,7 @@ int fuzz_spng_read(const uint8_t* data, size_t size)
         SPNG_TEXT_COMPRESSION_STRATEGY, // default 0, 0-4
         SPNG_FILTER_CHOICE, // default 0, 0-4
         SPNG_CHUNK_COUNT_LIMIT, // default 0, 0-UINT32_MAX
-        SPNG_ENCODE_TO_BUFFER // true, false
+        SPNG_ENCODE_TO_BUFFER, // true, false
     };
     int TOTAL_OPTIONS = sizeof(options_list) / sizeof(enum spng_option);
 
@@ -423,8 +423,8 @@ int fuzz_spng_read(const uint8_t* data, size_t size)
     int flags = decode_flags[rand() % TOTAL_DECODE_FLAGS];
     
     int num_options = rand() % TOTAL_OPTIONS;
-    int chosen_options[num_options];
-    int chosen_values[num_options];
+    int chosen_options[num_options+1];
+    int chosen_values[num_options+1];
     choose_random_options(options_list, TOTAL_OPTIONS, num_options, chosen_options, chosen_values);
 
     // Print configuration
@@ -1157,8 +1157,8 @@ int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config)
     int fmt = get_fmt_from_config(&config);
 
     int num_options = rand() % TOTAL_OPTIONS;
-    int chosen_options[num_options];
-    int chosen_values[num_options];
+    int chosen_options[num_options+1];
+    int chosen_values[num_options+1];
     choose_random_options(options_list, TOTAL_OPTIONS, num_options, chosen_options, chosen_values);
 
     // Print configuration

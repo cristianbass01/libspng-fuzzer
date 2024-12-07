@@ -15,11 +15,11 @@ set(CMAKE_C_COMPILER afl-clang-fast)
 set(CMAKE_CXX_COMPILER afl-clang-fast++)
 
 # Set AFL++ instrumentation flags
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer -g")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer -g")
 
 # Add the executable for the test program
-add_executable(decode_dev_zero decode_dev_zero.c)
+add_executable(generic_test fuzz/generic_test.c)
 
 # Link the library to the executable dynamically
-target_link_libraries(decode_dev_zero spng_static)
+target_link_libraries(generic_test spng_static)

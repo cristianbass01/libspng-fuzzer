@@ -56,6 +56,10 @@ zzuf-0.15/
 
 # AFL++ builds
 afl_build/
-afl_output_dir/
+afl_output_dir*/
 corpus/
 */output/radamsa/*
+minimized_corpus/
+unique_images/
+no_afl_name_build/
+

@@ -1,8 +1,8 @@
 # Compilers
 CC=gcc
 CLANG=clang
-AFLCC=afl-clang-lto
-AFLCXX=afl-clang-lto++
+AFLCC=afl-clang-fast
+AFLCXX=afl-clang-fast++
 
 # Libspng directories
 LIBSPNG_DIR=libspng
@@ -14,9 +14,14 @@ BUILD_DIR=build
 LIBSPNG_LIB=$(BUILD_DIR)/libspng.a
 
 # Flags
-CFLAGS= -Wall -Wextra -Werror -fno-omit-frame-pointer -I $(INCLUDE_DIR) -L $(BUILD_LIBSPNG_DIR) -lspng -g $(CPPFLAGS) 
-ASANFLAGS=-fsanitize=address 
+AFLCFLAGS= -Wall -Wextra -fno-omit-frame-pointer -I $(INCLUDE_DIR) -lz -lm
+CFLAGS= -Wall -Wextra -fno-omit-frame-pointer -I $(INCLUDE_DIR) -L $(BUILD_LIBSPNG_DIR) -lspng -g $(CPPFLAGS) 
+ASANFLAGS=-fsanitize=address
 MSANFLAGS=-fsanitize=memory -fPIE -pie -g
+
+# AFL++ Fuzzing input and minimization directories
+IMAGE_DIR=images
+UNIQUE_IMAGE_DIR=unique_images
 
 # Targets
 .PHONY: all clean libspng fuzz run_fuzz_% afl-fuzz
@@ -26,22 +31,6 @@ all: libspng fuzz #$(BUILD_DIR)/decode_dev_zero
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-# Build libspng
-$(LIBSPNG_LIB): $(BUILD_DIR)
-	cd $(LIBSPNG_DIR) && mkdir -p build && cd build && CC=$(AFLCC) CXX=$(AFLCXX) cmake -DBUILD_SHARED_LIBS=OFF .. && make
-	cp $(LIBSPNG_DIR)/build/libspng_static.a $(BUILD_DIR)/
-
-# Build decode_dev_zero
-$(BUILD_DIR)/decode_dev_zero: fuzz/decode_dev_zero.c $(LIBSPNG_LIB)
-	mkdir -p $(BUILD_DIR)
-	$(AFLCC) $(CFLAGS) -I$(INCLUDE_DIR) -L$(BUILD_DIR) -l:libspng_static.a  decode_dev_zero.c -o $(BUILD_DIR)/decode_dev_zero
-
-# Fuzzing target
-afl-fuzz: $(BUILD_DIR)/decode_dev_zero
-	afl-fuzz -i input_dir -o output_dir $(BUILD_DIR)/decode_dev_zero @@
-
-
-
 libspng/build/Makefile:
 	cmake -B libspng/build -S libspng
 
@@ -50,7 +39,11 @@ libspng: libspng/build/libspng.so
 libspng/build/libspng.so: libspng/build/Makefile
 	make -C libspng/build
 
-fuzz: libspng/build/libspng.so fuzz/test_fuzzer_descriptor.fuzz fuzz/decode_dev_zero.fuzz fuzz/simple_decode_dev_zero.fuzz fuzz/decode_encode_file.fuzz fuzz/generic_test.fuzz
+fuzz: fuzz/test_fuzzer_descriptor.fuzz fuzz/decode_dev_zero.fuzz fuzz/simple_decode_dev_zero.fuzz fuzz/decode_encode_file.fuzz fuzz/generic_test.fuzz \
+	fuzz/afl_test_fuzzer_descriptor_nosan.fuzz fuzz/afl_decode_dev_zero_nosan.fuzz fuzz/afl_simple_decode_dev_zero_nosan.fuzz fuzz/afl_decode_encode_file_nosan.fuzz \
+	fuzz/afl_generic_test_nosan.fuzz fuzz/afl_test_fuzzer_descriptor_asan.fuzz fuzz/afl_decode_dev_zero_asan.fuzz fuzz/afl_simple_decode_dev_zero_asan.fuzz \
+	fuzz/afl_decode_encode_file_asan.fuzz fuzz/afl_generic_test_asan.fuzz fuzz/afl_test_fuzzer_descriptor_msan.fuzz fuzz/afl_decode_dev_zero_msan.fuzz \
+	fuzz/afl_simple_decode_dev_zero_msan.fuzz fuzz/afl_decode_encode_file_msan.fuzz fuzz/afl_generic_test_msan.fuzz afl_minimize_input
 
 # FUZZER BUILD
 fuzz/%.fuzz: fuzz/%.c libspng/build/libspng.so
@@ -61,6 +54,21 @@ fuzz/%_asan.fuzz: fuzz/%.c libspng/build/libspng.so
 
 fuzz/%_msan.fuzz: fuzz/%.c libspng/build/libspng.so
 	$(CLANG) -o $@ $< $(CFLAGS) $(MSANFLAGS)
+
+# AFL BUILD
+
+fuzz/afl_%_nosan.fuzz: fuzz/%.c libspng/spng/spng.c
+	$(AFLCC) -static -o $@ fuzz/generic_test.c libspng/spng/spng.c $(AFLCFLAGS)
+
+fuzz/afl_%_asan.fuzz: fuzz/%.c libspng/spng/spng.c
+	AFL_USE_ASAN=1 $(AFLCC) -o $@ fuzz/generic_test.c libspng/spng/spng.c $(AFLCFLAGS)
+
+fuzz/afl_%_msan.fuzz: fuzz/%.c libspng/spng/spng.c
+	AFL_USE_MSAN=1 $(AFLCC) -o $@ fuzz/generic_test.c libspng/spng/spng.c $(AFLCFLAGS)
+
+afl_minimize_input: fuzz/afl_generic_test_nosan.fuzz
+	rm -rf $(UNIQUE_IMAGE_DIR)
+	afl-cmin -T all -i $(IMAGE_DIR) -o $(UNIQUE_IMAGE_DIR) -- fuzz/afl_test_fuzzer_descriptor_nosan.fuzz @@
 
 
 # Usage: if you want to run the executable <FILE>.fuzz file corresponding
