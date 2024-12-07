@@ -16,12 +16,21 @@
 // 1 uses AFL filename parsing function
 #define AFL_MODE 0
 
+// recommended maximum length for strings in initialization in write
+#define RECOMMENDED_MAX_LENGTH 100
+
+// probability of initializing the fields in write
+#define INITIALIZATION_PROB 1.0
+
 #define test(fn)                                                       \
     printf("Testing %s... ", #fn);                                     \
+    fflush(stdout);                                                    \
+    fflush(stderr);                                                    \
     fn_ret = fn;                                                       \
     if (fn_ret)                                                        \
         printf("returned %d: %s\n", fn_ret, spng_strerror(fn_ret));    \
     else printf("OK\n");
+
 
 // DECLARATION:
 int fuzz_spng_read(const uint8_t* data, size_t size);
@@ -119,11 +128,12 @@ void get_file_code_afl(const char *path, char *output);
 
 int main(int argc, char **argv)
 {
-    int urandom = open("/dev/urandom", O_RDONLY);
+    
  
-
     // Possibly we need to delete this part because the seed is set to the value at middle of the buffer
     /*
+    int urandom = open("/dev/urandom", O_RDONLY);
+    
     unsigned int seed;
     if(read(urandom, &seed, sizeof(seed)) != sizeof(seed))
     {
@@ -360,13 +370,18 @@ int fuzz_spng_read(const uint8_t* data, size_t size)
     struct spng_ihdr ihdr;
     struct spng_plte plte;
     struct spng_trns trns;
+
     struct spng_chrm chrm;
+
     struct spng_chrm_int chrm_int;
+
     double gama;
     uint32_t gama_int;
     struct spng_iccp iccp;
     struct spng_sbit sbit;
+
     uint8_t srgb_rendering_intent;
+
     struct spng_text text[4] = {0};
     struct spng_bkgd bkgd;
     struct spng_hist hist;
@@ -495,7 +510,7 @@ int fuzz_spng_read(const uint8_t* data, size_t size)
         test(spng_get_option(ctx, options_list[i], &value));
     }
 
-    size_t out_size;
+    size_t out_size = 0;
     test(spng_decoded_image_size(ctx, fmt, &out_size));
     if(fn_ret) goto err;
     if(out_size > 80000000) goto err;
@@ -505,6 +520,7 @@ int fuzz_spng_read(const uint8_t* data, size_t size)
 
     //// Test get methods
     test(spng_get_ihdr(ctx, &ihdr));
+    // ERROR IN MEMORY SANITIZER FOR GET METHODS
     test(spng_get_plte(ctx, &plte));
     test(spng_get_trns(ctx, &trns));
     test(spng_get_chrm(ctx, &chrm));
@@ -581,7 +597,7 @@ int fuzz_spng_read(const uint8_t* data, size_t size)
 
     test(spng_get_offs(ctx, &offs));
     test(spng_get_exif(ctx, &exif));
-    
+
     if(progressive)
     {
         // test scanline
@@ -942,7 +958,7 @@ void get_file_code_afl(const char *path, char *output) {
 
     int comma_counter = 0;
 
-    size_t intermediate_length = strlen(fileName);
+    //size_t intermediate_length = strlen(fileName);
 
     while(comma_counter < 3 && *fileName!='\0'){ //Reaching last comma of afl filenames
         if(*fileName == ','){
@@ -970,6 +986,32 @@ void get_file_code(const char *path, char *output) {
     output[length] = '\0'; // Null-terminate the string
 }
 
+char* get_random_string(size_t length) {
+    if (length == 0) return NULL;
+
+    char *str = (char *)malloc(length + 1);
+    if (!str) return NULL;
+
+    for (size_t i = 0; i < length; i++) {
+        str[i] = rand() % 256;
+    }
+    str[length] = '\0';
+    return str;
+}
+
+int random_choice(){
+    return rand() % 2;
+}
+
+int select_random_with_probability(double success_rate){
+    return rand() % 100 < (success_rate * 100);
+}
+
+int choose_to_initialize(){
+    // 10% probability of not initializing
+    return select_random_with_probability(INITIALIZATION_PROB);
+}
+
 /// @brief Fuzz function for spng_write
 /// @param data - data to write
 /// @param size - size of data
@@ -988,151 +1030,284 @@ int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config)
     size_t png_size = 0;
 
     struct spng_ihdr ihdr;
-    ihdr.width = config.size;
-    ihdr.height = config.size;
-    ihdr.bit_depth = config.bitDepth;
-    ihdr.color_type = config.colorType;
-    ihdr.compression_method = config.compression;
-    ihdr.filter_method = config.filtering;
-    ihdr.interlace_method = config.interlace;
+    if (choose_to_initialize()){
+        if (select_random_with_probability(0.9)){
+            ihdr.width = config.size;
+            ihdr.height = config.size;
+            ihdr.bit_depth = config.bitDepth;
+            ihdr.color_type = config.colorType;
+            ihdr.compression_method = config.compression;
+            ihdr.filter_method = config.filtering;
+            ihdr.interlace_method = config.interlace;
+        }
+        else {
+            ihdr.width = rand() % UINT32_MAX;
+            ihdr.height = rand() % UINT32_MAX;
+            ihdr.bit_depth = rand() % UINT8_MAX;
+            ihdr.color_type = rand() % 7;
+            ihdr.compression_method = rand() % 10;
+            ihdr.filter_method = rand() % 10;
+            ihdr.interlace_method = rand() % 2;
+        }
+    }
 
     struct spng_plte plte;
-    plte.n_entries = rand() % 256;
-    for (uint32_t i = 0; i < plte.n_entries; i++) {
-        plte.entries[i].red = rand() % 256;
-        plte.entries[i].green = rand() % 256;
-        plte.entries[i].blue = rand() % 256;
-        plte.entries[i].alpha = rand() % 256;
+    if (choose_to_initialize()){
+        plte.n_entries = rand() % RECOMMENDED_MAX_LENGTH;
+        for (uint32_t i = 0; i < plte.n_entries; i++) {
+            plte.entries[i].red = rand() % UINT8_MAX;
+            plte.entries[i].green = rand() % UINT8_MAX;
+            plte.entries[i].blue = rand() % UINT8_MAX;
+            plte.entries[i].alpha = rand() % UINT8_MAX;
+        }
     }
+    
 
     struct spng_trns trns;
-    trns.gray = rand() % 65536;
-    trns.red = rand() % 65536;
-    trns.green = rand() % 65536;
-    trns.blue = rand() % 65536;
-    trns.n_type3_entries = rand() % 256;
-    for (uint32_t i = 0; i < trns.n_type3_entries; i++) {
-        trns.type3_alpha[i] = rand() % 256;
+    if (choose_to_initialize()){
+        trns.gray = rand() % UINT16_MAX;
+        trns.red = rand() % UINT16_MAX;
+        trns.green = rand() % UINT16_MAX;
+        trns.blue = rand() % UINT16_MAX;
+        trns.n_type3_entries = rand() % UINT32_MAX;
+        int entries = rand() % 256;
+        for (int i = 0; i < entries; i++) {
+            trns.type3_alpha[i] = rand() % UINT8_MAX;
+        }
     }
+    
 
     struct spng_chrm chrm;
-    // random double values
-    chrm.white_point_x = rand() % 65536 / 1000.0;
-    chrm.white_point_y = rand() % 65536 / 1000.0;
-    chrm.red_x = rand() % 65536 / 1000.0;
-    chrm.red_y = rand() % 65536 / 1000.0;
-    chrm.green_x = rand() % 65536 / 1000.0;
-    chrm.green_y = rand() % 65536 / 1000.0;
-    chrm.blue_x = rand() % 65536 / 1000.0;
-    chrm.blue_y = rand() % 65536 / 1000.0;
+    if (choose_to_initialize()){
+        // random double values
+        chrm.white_point_x = rand() % 65536 / 1000.0;
+        chrm.white_point_y = rand() % 65536 / 1000.0;
+        chrm.red_x = rand() % 65536 / 1000.0;
+        chrm.red_y = rand() % 65536 / 1000.0;
+        chrm.green_x = rand() % 65536 / 1000.0;
+        chrm.green_y = rand() % 65536 / 1000.0;
+        chrm.blue_x = rand() % 65536 / 1000.0;
+        chrm.blue_y = rand() % 65536 / 1000.0;
+    }
+    
 
     struct spng_chrm_int chrm_int;
     // random uint32_t values
-    chrm_int.white_point_x = rand() % 65536;
-    chrm_int.white_point_y = rand() % 65536;
-    chrm_int.red_x = rand() % 65536;
-    chrm_int.red_y = rand() % 65536;
-    chrm_int.green_x = rand() % 65536;
-    chrm_int.green_y = rand() % 65536;
-    chrm_int.blue_x = rand() % 65536;
-    chrm_int.blue_y = rand() % 65536;
+    if(choose_to_initialize()){
+        chrm_int.white_point_x = rand() % UINT32_MAX;
+        chrm_int.white_point_y = rand() % UINT32_MAX;
+        chrm_int.red_x = rand() % UINT32_MAX;
+        chrm_int.red_y = rand() % UINT32_MAX;
+        chrm_int.green_x = rand() % UINT32_MAX;
+        chrm_int.green_y = rand() % UINT32_MAX;
+        chrm_int.blue_x = rand() % UINT32_MAX;
+        chrm_int.blue_y = rand() % UINT32_MAX;
+    }
+    
 
     double gama;
     uint32_t gama_int;
+
     if (config.testFeature == GAMMA) {
         gama = config.gamma;
         gama_int = (uint32_t)(config.gamma * 100);
     }
     else {
-        gama = rand() % 65536 / 1000.0;
-        gama_int = rand() % 65536;
+        gama = rand() % 65536 / 10000.0;
+        gama_int = rand() % UINT32_MAX;
     }
+    
+    
 
     struct spng_iccp iccp;
-    iccp.profile = (char *)data;
-    iccp.profile_len = size;
+    // Initialize or not at random (more probble to initialize)
+    if (choose_to_initialize()){
+        int length = rand() % 80;
+        for (int i = 0; i < length; i++) {
+            iccp.profile_name[i] = rand() % 256;
+        }
+        iccp.profile_name[length] = '\0';
+        iccp.profile = get_random_string(rand() % RECOMMENDED_MAX_LENGTH); // random string (at most 1000 chars)
+        iccp.profile_len = rand() % RECOMMENDED_MAX_LENGTH; // random length that can be larger than the actual string
+    }
 
     struct spng_sbit sbit;
-    sbit.grayscale_bits = config.significant_bits;
-    sbit.red_bits = config.significant_bits;
-    sbit.green_bits = config.significant_bits;
-    sbit.blue_bits = config.significant_bits;
-    sbit.alpha_bits = config.significant_bits;
+    if(choose_to_initialize()){
+        if (select_random_with_probability(0.9)){
+            sbit.grayscale_bits = config.significant_bits;
+            sbit.red_bits = config.significant_bits;
+            sbit.green_bits = config.significant_bits;
+            sbit.blue_bits = config.significant_bits;
+            sbit.alpha_bits = config.significant_bits;
+        }
+        else {
+            sbit.grayscale_bits = rand() % UINT8_MAX;
+            sbit.red_bits = rand() % UINT8_MAX;
+            sbit.green_bits = rand() % UINT8_MAX;
+            sbit.blue_bits = rand() % UINT8_MAX;
+            sbit.alpha_bits = rand() % UINT8_MAX;
+        }
+    }
     
-    uint8_t srgb_rendering_intent = rand() % 4;
-    struct spng_text text[4] = {0};
+    
+    uint8_t srgb_rendering_intent = rand() % UINT8_MAX;
+
+    // Initializing spng_text text
+    int n_text = rand() % 5;
+    struct spng_text text[n_text];
+    if (choose_to_initialize()){
+        for (int i = 0; i < n_text; i++) {
+            int length = rand() % 80;
+            for (int j = 0; j < length; j++) {
+                text[i].keyword[j] = rand() % 256;
+            }
+            text[i].keyword[length] = '\0';
+            text[i].text = get_random_string(rand() % RECOMMENDED_MAX_LENGTH); // random string (at most 1000 chars)
+            text[i].length = rand() % RECOMMENDED_MAX_LENGTH; // random length that can be larger than the actual string
+            text[i].type = rand() % 5; // 1 to 3 are valid types, 0 and 4 are invalid
+            text[i].compression_flag = rand() % UINT8_MAX;
+            text[i].language_tag = get_random_string(rand() % RECOMMENDED_MAX_LENGTH);
+            text[i].translated_keyword = get_random_string(rand() % RECOMMENDED_MAX_LENGTH);
+        }
+    }
+
     struct spng_bkgd bkgd;
-    if (config.background == GRAY){
-        bkgd.gray = rand() % 256;
-    }
-    else if (config.background == BLACK){
-        bkgd.red = 0;
-        bkgd.green = 0;
-        bkgd.blue = 0;
-    }
-    else if (config.background == WHITE){
-        bkgd.red = 255;
-        bkgd.green = 255;
-        bkgd.blue = 255;
-    }
-    else if (config.background == YELLOW){
-        bkgd.red = 255;
-        bkgd.green = 255;
-        bkgd.blue = 0;
+    if (choose_to_initialize()){
+        if (config.background == GRAY){
+            bkgd.gray = rand() % UINT16_MAX;
+        }
+        else if (config.background == BLACK){
+            bkgd.red = 0;
+            bkgd.green = 0;
+            bkgd.blue = 0;
+        }
+        else if (config.background == WHITE){
+            bkgd.red = 255;
+            bkgd.green = 255;
+            bkgd.blue = 255;
+        }
+        else if (config.background == YELLOW){
+            bkgd.red = 255;
+            bkgd.green = 255;
+            bkgd.blue = 0;
+        } 
+        else if (random_choice()){
+            bkgd.red = rand() % UINT16_MAX;
+            bkgd.green = rand() % UINT16_MAX;
+            bkgd.blue = rand() % UINT16_MAX;
+        }
+        else if (random_choice()){
+            bkgd.gray = rand() % UINT16_MAX;
+        }
+        else{
+            bkgd.plte_index = rand() % UINT16_MAX;
+        }
     }
 
     struct spng_hist hist;
-    if (config.testFeature == HISTOGRAM && config.histogram_colors == 15) {
-        for (int i = 0; i < 15; i++) {
-            hist.frequency[i] = rand() % 65536;
-        }
-        for (int i = 15; i < 256; i++) {
-            hist.frequency[i] = 0;
-        }
-    } else {
-        for (int i = 0; i < 256; i++) {
-            hist.frequency[i] = rand() % 65536;
+    if (choose_to_initialize()){
+        if (config.testFeature == HISTOGRAM && config.histogram_colors == 15) {
+            for (int i = 0; i < 15; i++) {
+                hist.frequency[i] = rand() % UINT16_MAX;
+            }
+            for (int i = 15; i < 256; i++) {
+                hist.frequency[i] = 0;
+            }
+        } else {
+            for (int i = 0; i < 256; i++) {
+                hist.frequency[i] = rand() % UINT16_MAX;
+            }
         }
     }
 
     struct spng_phys phys;
-    if(config.testFeature == PHYSICAL_PIXELS){
-        phys.ppu_x = config.ppu_x;
-        phys.ppu_y = config.ppu_y;
-        phys.unit_specifier = config.unit_specifier;
-    }
-    else{
-        phys.ppu_x = rand() % 1000;
-        phys.ppu_y = rand() % 1000;
-        phys.unit_specifier = rand() % 2;
+    if(choose_to_initialize()){
+        if(config.testFeature == PHYSICAL_PIXELS){
+            phys.ppu_x = config.ppu_x;
+            phys.ppu_y = config.ppu_y;
+            phys.unit_specifier = config.unit_specifier;
+        }
+        else{
+            phys.ppu_x = rand() % UINT32_MAX;
+            phys.ppu_y = rand() % UINT32_MAX;
+            phys.unit_specifier = rand() % 3; // 0, 1, 2 (invalid)
+        }
     }
 
-    struct spng_splt splt[4] = {0};
+    uint32_t n_splt = rand() % 5;
+    struct spng_splt splt[n_splt];
+    if(choose_to_initialize()){
+        for (uint32_t i = 0; i < n_splt; i++) {
+            int length = rand() % 80;
+            for (int j = 0; j < length; j++) {
+                splt[i].name[j] = rand() % 256;
+            }
+            splt[i].name[length] = '\0';
+            splt[i].sample_depth = rand() % 3 * 8; // 0, 8, 16 which 0 is invalid
+            splt[i].n_entries = rand() % RECOMMENDED_MAX_LENGTH;
+            splt[i].entries = (struct spng_splt_entry*)malloc(splt[i].n_entries * sizeof(struct spng_splt_entry));
+            for (uint32_t j = 0; j < splt[i].n_entries; j++) {
+                splt[i].entries[j].red = rand() % UINT16_MAX;
+                splt[i].entries[j].green = rand() % UINT16_MAX;
+                splt[i].entries[j].blue = rand() % UINT16_MAX;
+                splt[i].entries[j].alpha = rand() % UINT16_MAX;
+                splt[i].entries[j].frequency = rand() % UINT16_MAX;
+            }
+        }
+    }
+
     struct spng_time time;
-    if(config.testFeature == TIME){
-        time.year = config.time.year;
-        time.month = config.time.month;
-        time.day = config.time.day;
+    if(choose_to_initialize()){
+        if(config.testFeature == TIME){
+            time.year = config.time.year;
+            time.month = config.time.month;
+            time.day = config.time.day;
+        }
+        else{
+            time.year = rand() % UINT16_MAX;
+            time.month = rand() % UINT8_MAX;
+            time.day = rand() % UINT8_MAX;
+        }
+        time.hour = rand() % UINT8_MAX;
+        time.minute = rand() % UINT8_MAX;
+        time.second = rand() % UINT8_MAX;
     }
-    else{
-        time.year = rand() % 65536;
-        time.month = rand() % 13;
-        time.day = rand() % 32;
-    }
-    time.hour = rand() % 24;
-    time.minute = rand() % 60;
-    time.second = rand() % 60;
 
-    struct spng_unknown_chunk chunks[4] = {0};
-    uint32_t n_text = 4, n_splt = 4, n_chunks = 4;
+    uint32_t n_chunks = rand() % 5;
+    struct spng_unknown_chunk chunks[n_chunks];
+    if(choose_to_initialize()){
+        for (uint32_t i = 0; i < n_chunks; i++) {
+            int length = rand() % 4;
+            for (int j = 0; j < length; j++) {
+                chunks[i].type[j] = rand() % 256;
+            }
+            chunks[i].type[length] = '\0';
+            chunks[i].length = rand() % RECOMMENDED_MAX_LENGTH;
+            chunks[i].data = get_random_string(rand() % RECOMMENDED_MAX_LENGTH);
+            // location can be 0 (invalid), 1, 2 or 8
+            int value = rand() % 4;
+            if (value == 3) value = 8;
+            chunks[i].location = value;
+
+        }
+    }
 
     struct spng_offs offs;
-    struct spng_exif exif;
+    if(choose_to_initialize()){
+        offs.unit_specifier = rand() % 3; // 0, 1, 2 (invalid)
+        offs.x = rand() % UINT32_MAX;
+        offs.y = rand() % UINT32_MAX;
+    }
 
+    struct spng_exif exif;
+    if(choose_to_initialize()){
+        exif.data = get_random_string(rand() % RECOMMENDED_MAX_LENGTH);
+        exif.length = rand() % RECOMMENDED_MAX_LENGTH;
+    }
 
     struct buf_state state;
     state.data = NULL;
-    state.bytes_left = SIZE_MAX;
+    state.bytes_left = rand() % SIZE_MAX;
 
     enum spng_option options_list[] = {
         SPNG_KEEP_UNKNOWN_CHUNKS, // true, false
@@ -1222,7 +1397,12 @@ int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config)
     test(spng_set_time(ctx, &time));
     test(spng_set_unknown_chunks(ctx, chunks, n_chunks));
     test(spng_set_offs(ctx, &offs));
+    
+    // ERROR FOUND
+    // Compilation with -Onumber causes segmentation fault if there is no exif data
+    // for some configuration it throw segmentation fault even if there is exif data
     test(spng_set_exif(ctx, &exif));
+    
 
     // Test colorspace
     switch(ihdr.color_type)
@@ -1266,7 +1446,7 @@ int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config)
 
         // test row
         size_t ioffset, img_width = img_size / ihdr.height;
-        struct spng_row_info ri;
+        struct spng_row_info ri = {0};
 
         do
         {

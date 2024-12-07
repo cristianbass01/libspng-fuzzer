@@ -338,21 +338,21 @@ int fuzz_spng_read(const uint8_t *data, size_t size)
         SPNG_DECODE_TRNS, SPNG_DECODE_GAMMA, SPNG_DECODE_PROGRESSIVE};
     int TOTAL_DECODE_FLAGS = sizeof(decode_flags) / sizeof(enum spng_decode_flags);
 
-    enum spng_option options_list[] = {
-        SPNG_KEEP_UNKNOWN_CHUNKS,       // true, false
-        SPNG_IMG_COMPRESSION_LEVEL,     // defaul -1, 0-9
-        SPNG_IMG_WINDOW_BITS,           // default 15, 8-15
-        SPNG_IMG_MEM_LEVEL,             // default 8, 1-9
-        SPNG_IMG_COMPRESSION_STRATEGY,  // default 0, 0-4
-        SPNG_TEXT_COMPRESSION_LEVEL,    // default -1, 0-9
-        SPNG_TEXT_WINDOW_BITS,          // default 15, 8-15
-        SPNG_TEXT_MEM_LEVEL,            // default 8, 1-9
-        SPNG_TEXT_COMPRESSION_STRATEGY, // default 0, 0-4
-        SPNG_FILTER_CHOICE,             // default 0, 0-4
-        SPNG_CHUNK_COUNT_LIMIT,         // default 0, 0-UINT32_MAX
-        SPNG_ENCODE_TO_BUFFER           // true, false
-    };
-    int TOTAL_OPTIONS = sizeof(options_list) / sizeof(enum spng_option);
+    //enum spng_option options_list[] = {
+    //    SPNG_KEEP_UNKNOWN_CHUNKS,       // true, false
+    //    SPNG_IMG_COMPRESSION_LEVEL,     // defaul -1, 0-9
+    //    SPNG_IMG_WINDOW_BITS,           // default 15, 8-15
+    //    SPNG_IMG_MEM_LEVEL,             // default 8, 1-9
+    //    SPNG_IMG_COMPRESSION_STRATEGY,  // default 0, 0-4
+    //    SPNG_TEXT_COMPRESSION_LEVEL,    // default -1, 0-9
+    //    SPNG_TEXT_WINDOW_BITS,          // default 15, 8-15
+    //    SPNG_TEXT_MEM_LEVEL,            // default 8, 1-9
+    //    SPNG_TEXT_COMPRESSION_STRATEGY, // default 0, 0-4
+    //    SPNG_FILTER_CHOICE,             // default 0, 0-4
+    //    SPNG_CHUNK_COUNT_LIMIT,         // default 0, 0-UINT32_MAX
+    //    SPNG_ENCODE_TO_BUFFER           // true, false
+    //};
+    //int TOTAL_OPTIONS = sizeof(options_list) / sizeof(enum spng_option);
 
     // Set up random configuration
     int stream = rand() % 2;
@@ -545,7 +545,8 @@ err:
         goto error;                                                                         \
     }
 
-int main(int argc, char **argv)
+//int main(int argc, char **argv)
+int main()
 {
     FILE *urandom = fopen("/dev/urandom", "rb");
     unsigned int seed;
@@ -565,7 +566,8 @@ int main(int argc, char **argv)
     int fd = open("radamsa/images/mario.png", O_RDONLY);
     if (fd == -1)
     {
-        fprintf(stderr, "error opening input file %s\n", argv[1]);
+        //fprintf(stderr, "error opening input file %s\n", argv[1]);
+        fprintf(stderr, "error opening input file\n");
         goto error;
     }
 

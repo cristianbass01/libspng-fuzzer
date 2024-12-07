@@ -1,8 +1,14 @@
 #!/bin/bash
 
+if [ -z "$1" ]; then
+    echo "Usage: $0 <executable>"
+    exit 1
+fi
+
+EXECUTABLE="$1"
+
 # Directory containing the initial seed files
 SEED_DIR="./images"  # Directory with initial seed files (e.g., PNG files)
-EXECUTABLE="./fuzz/generic_test_asan.fuzz"
 echo "Using executable: $EXECUTABLE"
 
 SAVE_ALL_LOGS=0  # Set to 1 to save all logs, including successful runs
@@ -37,6 +43,12 @@ while true; do
         SEED_NAME=$(basename "$SEED_FILE")  # Get the filename without the path
         SEED_NAME="${SEED_NAME%.*}"  # Remove the file extension
 
+        # if the seed name starts with ct and ends with n0g04, skip it (but not if the char in the middle is 0)
+        if [[ "$SEED_NAME" =~ ^ct.*n0g04$ && ! "$SEED_NAME" =~ ^ct0.*n0g04$ ]]; then
+            #echo "Skipping seed file: $SEED_NAME"
+            continue
+        fi
+
         # Generate mutated versions from seed file
         SEED_NUMBER=$((SEED_NUMBER + 1))
 
@@ -48,6 +60,7 @@ while true; do
         for MUTATED_FILE in $MUTATED_DIR/*; do
             # Run the mutated file through the program that uses libspng
             # Capture the exit status of the program
+            #strace -e trace=write $EXECUTABLE $MUTATED_FILE > $TMP_LOG_FILE 2>&1
             $EXECUTABLE $MUTATED_FILE > $TMP_LOG_FILE 2>&1
             EXIT_STATUS=$?
 
@@ -79,7 +92,7 @@ while true; do
                 echo "----------------------------------------------------" >> $SEGM_FAULT_LOG_DIR/crash_report.txt
 
                 # Save the file with a unique name based on the mutation count
-                cp $MUTATED_FILE $SEGM_FAULT_LOG_DIR/crash_$COUNTER.png
+                cp $MUTATED_FILE $SEGM_FAULT_LOG_DIR/${SEED_NAME}_$COUNTER.png
 
             elif [ $EXIT_STATUS -ne 0 ]; then
                 # Increment the error count
@@ -95,12 +108,11 @@ while true; do
                 echo "----------------------------------------------------" >> $ERROR_LOG_DIR/crash_report.txt
 
                 # Save the file with a unique name based on the mutation count
-                cp $MUTATED_FILE $ERROR_LOG_DIR/crash_$COUNTER.png
+                cp $MUTATED_FILE $ERROR_LOG_DIR/${SEED_NAME}_$COUNTER.png
             fi
 
             # Print the current mutation count on the same line
-            echo -ne "Counter $COUNTER - Mutating $SEED_NAME - Error count $COUNTER_ERRORS - Segmentation fault count $COUNTER_SEG_FAULTS - time elapsed: $(( $(date +%s) - $START_TIME ))\r"
-
+            echo -ne "Counter $COUNTER - Mutating $SEED_NAME - Errors $COUNTER_ERRORS - Segm. faults $COUNTER_SEG_FAULTS - time: $(( $(date +%s) - $START_TIME ))\r"
             
         done  # Inner for loop for all mutated files
         
