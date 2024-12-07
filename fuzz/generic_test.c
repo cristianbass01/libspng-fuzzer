@@ -16,7 +16,11 @@
 // 1 uses AFL filename parsing function
 #define AFL_MODE 0
 
+// recommended maximum length for strings in initialization in write
 #define RECOMMENDED_MAX_LENGTH 100
+
+// probability of initializing the fields in write
+#define INITIALIZATION_PROB 1.0
 
 #define test(fn)                                                       \
     printf("Testing %s... ", #fn);                                     \
@@ -366,13 +370,18 @@ int fuzz_spng_read(const uint8_t* data, size_t size)
     struct spng_ihdr ihdr;
     struct spng_plte plte;
     struct spng_trns trns;
+
     struct spng_chrm chrm;
+
     struct spng_chrm_int chrm_int;
+
     double gama;
     uint32_t gama_int;
     struct spng_iccp iccp;
     struct spng_sbit sbit;
+
     uint8_t srgb_rendering_intent;
+
     struct spng_text text[4] = {0};
     struct spng_bkgd bkgd;
     struct spng_hist hist;
@@ -501,7 +510,7 @@ int fuzz_spng_read(const uint8_t* data, size_t size)
         test(spng_get_option(ctx, options_list[i], &value));
     }
 
-    size_t out_size;
+    size_t out_size = 0;
     test(spng_decoded_image_size(ctx, fmt, &out_size));
     if(fn_ret) goto err;
     if(out_size > 80000000) goto err;
@@ -511,6 +520,7 @@ int fuzz_spng_read(const uint8_t* data, size_t size)
 
     //// Test get methods
     test(spng_get_ihdr(ctx, &ihdr));
+    // ERROR IN MEMORY SANITIZER FOR GET METHODS
     test(spng_get_plte(ctx, &plte));
     test(spng_get_trns(ctx, &trns));
     test(spng_get_chrm(ctx, &chrm));
@@ -587,7 +597,7 @@ int fuzz_spng_read(const uint8_t* data, size_t size)
 
     test(spng_get_offs(ctx, &offs));
     test(spng_get_exif(ctx, &exif));
-    
+
     if(progressive)
     {
         // test scanline
@@ -999,8 +1009,7 @@ int select_random_with_probability(double success_rate){
 
 int choose_to_initialize(){
     // 10% probability of not initializing
-    double success_rate = 0.98;
-    return select_random_with_probability(success_rate);
+    return select_random_with_probability(INITIALIZATION_PROB);
 }
 
 /// @brief Fuzz function for spng_write
@@ -1117,6 +1126,7 @@ int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config)
         for (int i = 0; i < length; i++) {
             iccp.profile_name[i] = rand() % 256;
         }
+        iccp.profile_name[length] = '\0';
         iccp.profile = get_random_string(rand() % RECOMMENDED_MAX_LENGTH); // random string (at most 1000 chars)
         iccp.profile_len = rand() % RECOMMENDED_MAX_LENGTH; // random length that can be larger than the actual string
     }
@@ -1151,6 +1161,7 @@ int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config)
             for (int j = 0; j < length; j++) {
                 text[i].keyword[j] = rand() % 256;
             }
+            text[i].keyword[length] = '\0';
             text[i].text = get_random_string(rand() % RECOMMENDED_MAX_LENGTH); // random string (at most 1000 chars)
             text[i].length = rand() % RECOMMENDED_MAX_LENGTH; // random length that can be larger than the actual string
             text[i].type = rand() % 5; // 1 to 3 are valid types, 0 and 4 are invalid
@@ -1223,14 +1234,15 @@ int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config)
         }
     }
 
-    int n_splt = rand() % 5;
+    uint32_t n_splt = rand() % 5;
     struct spng_splt splt[n_splt];
     if(choose_to_initialize()){
-        for (int i = 0; i < n_splt; i++) {
+        for (uint32_t i = 0; i < n_splt; i++) {
             int length = rand() % 80;
             for (int j = 0; j < length; j++) {
                 splt[i].name[j] = rand() % 256;
             }
+            splt[i].name[length] = '\0';
             splt[i].sample_depth = rand() % 3 * 8; // 0, 8, 16 which 0 is invalid
             splt[i].n_entries = rand() % RECOMMENDED_MAX_LENGTH;
             splt[i].entries = (struct spng_splt_entry*)malloc(splt[i].n_entries * sizeof(struct spng_splt_entry));
@@ -1261,14 +1273,15 @@ int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config)
         time.second = rand() % UINT8_MAX;
     }
 
-    int n_chunks = rand() % 5;
+    uint32_t n_chunks = rand() % 5;
     struct spng_unknown_chunk chunks[n_chunks];
     if(choose_to_initialize()){
-        for (int i = 0; i < n_chunks; i++) {
+        for (uint32_t i = 0; i < n_chunks; i++) {
             int length = rand() % 4;
             for (int j = 0; j < length; j++) {
                 chunks[i].type[j] = rand() % 256;
             }
+            chunks[i].type[length] = '\0';
             chunks[i].length = rand() % RECOMMENDED_MAX_LENGTH;
             chunks[i].data = get_random_string(rand() % RECOMMENDED_MAX_LENGTH);
             // location can be 0 (invalid), 1, 2 or 8
@@ -1433,7 +1446,7 @@ int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config)
 
         // test row
         size_t ioffset, img_width = img_size / ihdr.height;
-        struct spng_row_info ri;
+        struct spng_row_info ri = {0};
 
         do
         {

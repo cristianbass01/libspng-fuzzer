@@ -30,7 +30,7 @@ mkdir -p $SEGM_FAULT_LOG_DIR
 # Initialize mutation count
 COUNTER=0
 SEED_NUMBER=0
-MUTATIONS_PER_SEED_FILE=10  # Number of mutations per seed file
+MUTATIONS_PER_SEED_FILE=1000  # Number of mutations per seed file
 COUNTER_ERRORS=0
 COUNTER_SEG_FAULTS=0
 
@@ -42,6 +42,12 @@ while true; do
     for SEED_FILE in $SEED_DIR/*.png; do
         SEED_NAME=$(basename "$SEED_FILE")  # Get the filename without the path
         SEED_NAME="${SEED_NAME%.*}"  # Remove the file extension
+
+        # if the seed name starts with ct and ends with n0g04, skip it (but not if the char in the middle is 0)
+        if [[ "$SEED_NAME" =~ ^ct.*n0g04$ && ! "$SEED_NAME" =~ ^ct0.*n0g04$ ]]; then
+            #echo "Skipping seed file: $SEED_NAME"
+            continue
+        fi
 
         # Generate mutated versions from seed file
         SEED_NUMBER=$((SEED_NUMBER + 1))
@@ -86,7 +92,7 @@ while true; do
                 echo "----------------------------------------------------" >> $SEGM_FAULT_LOG_DIR/crash_report.txt
 
                 # Save the file with a unique name based on the mutation count
-                cp $MUTATED_FILE $SEGM_FAULT_LOG_DIR/crash_$COUNTER.png
+                cp $MUTATED_FILE $SEGM_FAULT_LOG_DIR/${SEED_NAME}_$COUNTER.png
 
             elif [ $EXIT_STATUS -ne 0 ]; then
                 # Increment the error count
@@ -102,12 +108,11 @@ while true; do
                 echo "----------------------------------------------------" >> $ERROR_LOG_DIR/crash_report.txt
 
                 # Save the file with a unique name based on the mutation count
-                cp $MUTATED_FILE $ERROR_LOG_DIR/crash_$COUNTER.png
+                cp $MUTATED_FILE $ERROR_LOG_DIR/${SEED_NAME}_$COUNTER.png
             fi
 
             # Print the current mutation count on the same line
             echo -ne "Counter $COUNTER - Mutating $SEED_NAME - Errors $COUNTER_ERRORS - Segm. faults $COUNTER_SEG_FAULTS - time: $(( $(date +%s) - $START_TIME ))\r"
-            
             
         done  # Inner for loop for all mutated files
         
