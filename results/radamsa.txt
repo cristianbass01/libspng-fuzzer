@@ -4,15 +4,28 @@ Counter 5154000 - Error count 54 - Segmentation fault count 0
 All errors where generated because the file was empty (so not a library problem)
 Time: 9 hours
 
+With Address sanitizers:
 
 Using executable: ./fuzz/generic_test_asan.fuzz
 ^Cunter 3224426 - Mutating f99n0g04 - Errors 0 - Segm. faults 0 - time: 62345
 
+With Memory Sanitizer
+
 Using executable: ./fuzz/generic_test_msan.fuzz
+./fuzz_radamsa.sh: line 42: 4027717 Segmentation fault      (core dumped) radamsa -o $MUTATED_FILES -s $SEED_NUMBER -n $MUTATIONS_PER_SEED_FILE $SEED_FILE
+^Cunter 4654592 - Mutating s32n3p04 - Errors 971 - Segm. faults 0 - time: 64500
+
 
 -------------------------------------------------------------------------------------------
 
-ERROR IN MEMORY SANITIZER
+// ERROR FOUND IN OPTIMIZED COMPILATION
+// Compilation with -Onumber causes segmentation fault if there is no exif data
+// for some configuration it throw segmentation fault even if there is exif data
+test(spng_set_exif(ctx, &exif));
+
+-------------------------------------------------------------------------------------------
+
+ERROR IN MEMORY SANITIZER 
 error due to use of uninitialized variable in line 2905:
 text->text_length = strlen(text->text);
 in function read_non_idat_chunks
@@ -40,6 +53,8 @@ Exiting
 
 FOUND ANOTHER ERROR WITH MEMORY SANITIZER:
 
+Error found for configurations of images: tbbn2c16, tbgn2c16, tbrn2c08.
+
 Error detected on seed number 304 for seed file: tbbn2c16!
 Counter at: 3038
 Mutated File: ./output/radamsa/mutated/tbbn2c16_7.png
@@ -59,47 +74,7 @@ Configuration:
  - Option 1, Value 0
  - Option 4, Value 4
  - Option 1, Value 1
-libspng version: 0.7.4
-Testing spng_set_png_stream(ctx, buffer_read_fn, &state)... OK
-Testing spng_get_image_limits(ctx, &width, &height)... OK
-Testing spng_set_image_limits(ctx, 200000, 200000)... OK
-Testing spng_get_chunk_limits(ctx, &limits, &limits)... OK
-Testing spng_set_chunk_limits(ctx, limits, limits * 2)... OK
-Testing spng_set_crc_action(ctx, SPNG_CRC_USE, discard ? SPNG_CRC_DISCARD : SPNG_CRC_USE)... OK
-Testing spng_set_option(ctx, chosen_options[i], chosen_values[i])... OK
-Testing spng_set_option(ctx, chosen_options[i], chosen_values[i])... OK
-Testing spng_set_option(ctx, chosen_options[i], chosen_values[i])... OK
-Testing spng_set_option(ctx, chosen_options[i], chosen_values[i])... OK
-Testing spng_set_option(ctx, SPNG_KEEP_UNKNOWN_CHUNKS, 1)... OK
-Testing spng_get_option(ctx, options_list[i], &value)... OK
-Testing spng_get_option(ctx, options_list[i], &value)... OK
-Testing spng_get_option(ctx, options_list[i], &value)... OK
-Testing spng_get_option(ctx, options_list[i], &value)... OK
-Testing spng_get_option(ctx, options_list[i], &value)... OK
-Testing spng_get_option(ctx, options_list[i], &value)... OK
-Testing spng_get_option(ctx, options_list[i], &value)... OK
-Testing spng_get_option(ctx, options_list[i], &value)... OK
-Testing spng_get_option(ctx, options_list[i], &value)... OK
-Testing spng_get_option(ctx, options_list[i], &value)... OK
-Testing spng_get_option(ctx, options_list[i], &value)... OK
-Testing spng_get_option(ctx, options_list[i], &value)... OK
-Testing spng_decoded_image_size(ctx, fmt, &out_size)... OK
-Testing spng_get_ihdr(ctx, &ihdr)... OK
-Testing spng_get_plte(ctx, &plte)... returned 73: chunk not available
-Testing spng_get_trns(ctx, &trns)... OK
-Testing spng_get_chrm(ctx, &chrm)... returned 73: chunk not available
-Testing spng_get_chrm_int(ctx, &chrm_int)... returned 73: chunk not available
-Testing spng_get_gama(ctx, &gama)... OK
-Testing spng_get_gama_int(ctx, &gama_int)... OK
-Testing spng_get_iccp(ctx, &iccp)... returned 73: chunk not available
-Testing spng_get_sbit(ctx, &sbit)... returned 73: chunk not available
-Testing spng_get_srgb(ctx, &srgb_rendering_intent)... returned 73: chunk not available
-Testing spng_get_text...OK
-Testing spng_get_bkgd(ctx, &bkgd)... OK
-Testing spng_get_hist(ctx, &hist)... returned 73: chunk not available
-Testing spng_get_phys(ctx, &phys)... returned 73: chunk not available
-Testing spng_get_splt...OK
-Testing spng_get_offs(ctx, &offs)... returned 73: chunk not available
+
 Testing spng_get_exif(ctx, &exif)... returned 73: chunk not available
 Testing spng_decode_image(ctx, img, out_size, fmt, flags)... Uninitialized bytes in MemcmpInterceptorCommon at offset 0 inside [0x70f000000000, 6)
 ==960416==WARNING: MemorySanitizer: use-of-uninitialized-value
