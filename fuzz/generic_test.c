@@ -1355,7 +1355,7 @@ int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config)
 
     // Test spng_ctx_new
     spng_ctx *ctx = spng_ctx_new(SPNG_CTX_ENCODER);
-    if(ctx == NULL) return 0;
+    if(ctx == NULL) goto err;
 
     test(spng_set_image_limits(ctx, 200000, 200000));
 
@@ -1464,9 +1464,45 @@ int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config)
         png = spng_get_png_buffer(ctx, &png_size, &fn_ret);
 
         // These are potential vulnerabilities
-        if(png && !png_size) return 1;
-        if(!png && png_size) return 1;
-        if(fn_ret && (png || png_size)) return 1;
+        if((png && !png_size) || (!png && png_size) || (fn_ret && (png || png_size))){
+
+            // Test spng_ctx_free
+            if(ctx != NULL){
+                printf("Testing spng_ctx_free...");
+                spng_ctx_free(ctx);
+                printf("OK\n");
+            }
+            
+            // free splt entries    
+            for(uint32_t i = 0; i < n_splt; i++)
+            {
+                if(splt[i].entries != NULL) free(splt[i].entries);
+            }
+
+            // free iccp profile
+            if(iccp.profile != NULL) free(iccp.profile);
+
+            // free text
+            for(int i = 0; i < n_text; i++)
+            {
+                if(text[i].text != NULL) free(text[i].text);
+                if(text[i].language_tag != NULL) free(text[i].language_tag);
+                if(text[i].translated_keyword != NULL) free(text[i].translated_keyword);
+            }
+
+            // free exif data
+            if(exif.data != NULL) free(exif.data);
+
+            // free unknown chunks
+            for(uint32_t i = 0; i < n_chunks; i++)
+            {
+                if(chunks[i].data != NULL) free(chunks[i].data);
+            }
+
+            // end spng_ctx_free
+            if(png != NULL) free(png);
+            return 1;
+        }
     }
 
     // Test spng_ctx_free    
@@ -1476,6 +1512,32 @@ int fuzz_spng_write(const uint8_t* data, size_t size, PNGConfig config)
         printf("OK\n");
     } 
     // end spng_ctx_free
+
+    // free splt entries    
+    for(uint32_t i = 0; i < n_splt; i++)
+    {
+        if(splt[i].entries != NULL) free(splt[i].entries);
+    }
+
+    // free iccp profile
+    if(iccp.profile != NULL) free(iccp.profile);
+
+    // free text
+    for(int i = 0; i < n_text; i++)
+    {
+        if(text[i].text != NULL) free(text[i].text);
+        if(text[i].language_tag != NULL) free(text[i].language_tag);
+        if(text[i].translated_keyword != NULL) free(text[i].translated_keyword);
+    }
+
+    // free exif data
+    if(exif.data != NULL) free(exif.data);
+
+    // free unknown chunks
+    for(uint32_t i = 0; i < n_chunks; i++)
+    {
+        if(chunks[i].data != NULL) free(chunks[i].data);
+    }
 
     printf("Finished\n");
     if(png != NULL) free(png);
@@ -1488,6 +1550,33 @@ err:
         spng_ctx_free(ctx);
         printf("OK\n");
     } 
+
+    // free splt entries    
+    for(uint32_t i = 0; i < n_splt; i++)
+    {
+        if(splt[i].entries != NULL) free(splt[i].entries);
+    }
+
+    // free iccp profile
+    if(iccp.profile != NULL) free(iccp.profile);
+
+    // free text
+    for(int i = 0; i < n_text; i++)
+    {
+        if(text[i].text != NULL) free(text[i].text);
+        if(text[i].language_tag != NULL) free(text[i].language_tag);
+        if(text[i].translated_keyword != NULL) free(text[i].translated_keyword);
+    }
+
+    // free exif data
+    if(exif.data != NULL) free(exif.data);
+
+    // free unknown chunks
+    for(uint32_t i = 0; i < n_chunks; i++)
+    {
+        if(chunks[i].data != NULL) free(chunks[i].data);
+    }
+
     // end spng_ctx_free
     printf("Finished with error\n");
     if(png != NULL) free(png);
