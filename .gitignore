@@ -58,4 +58,4 @@ zzuf-0.15/
 afl_build/
 afl_output_dir/
 corpus/
-*/output/radamsa/*
+*/radamsa*
