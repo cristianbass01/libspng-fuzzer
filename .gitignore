@@ -62,4 +62,6 @@ corpus/
 minimized_corpus/
 unique_images/
 no_afl_name_build/
+crash_input/
+analyzed_crashes/
 

@@ -39,6 +39,9 @@ libspng: libspng/build/libspng.so
 libspng/build/libspng.so: libspng/build/Makefile
 	make -C libspng/build
 
+generic_test: fuzz/generic_test.c libspng/build/libspng.so
+	$(CC) -o $@ $< $(CFLAGS)
+
 fuzz: fuzz/test_fuzzer_descriptor.fuzz fuzz/decode_dev_zero.fuzz fuzz/simple_decode_dev_zero.fuzz fuzz/decode_encode_file.fuzz fuzz/generic_test.fuzz \
 	fuzz/afl_test_fuzzer_descriptor_nosan.fuzz fuzz/afl_decode_dev_zero_nosan.fuzz fuzz/afl_simple_decode_dev_zero_nosan.fuzz fuzz/afl_decode_encode_file_nosan.fuzz \
 	fuzz/afl_generic_test_nosan.fuzz fuzz/afl_test_fuzzer_descriptor_asan.fuzz fuzz/afl_decode_dev_zero_asan.fuzz fuzz/afl_simple_decode_dev_zero_asan.fuzz \
@@ -68,7 +71,7 @@ fuzz/afl_%_msan.fuzz: fuzz/%.c libspng/spng/spng.c
 
 afl_minimize_input: fuzz/afl_generic_test_nosan.fuzz
 	rm -rf $(UNIQUE_IMAGE_DIR)
-	afl-cmin -T all -i $(IMAGE_DIR) -o $(UNIQUE_IMAGE_DIR) -- fuzz/afl_test_fuzzer_descriptor_nosan.fuzz @@
+	afl-cmin -T all -i $(IMAGE_DIR) -o $(UNIQUE_IMAGE_DIR) -- fuzz/afl_generic_test_nosan.fuzz @@
 
 
 # Usage: if you want to run the executable <FILE>.fuzz file corresponding
