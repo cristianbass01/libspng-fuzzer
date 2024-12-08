@@ -6,6 +6,7 @@ if [ -z "$1" ]; then
 fi
 
 EXECUTABLE="$1"
+echo "Using executable: $EXECUTABLE"
 
 if [[ "$EXECUTABLE" == *asan* ]]; then
     SANITIZER="asan"
@@ -17,8 +18,7 @@ fi
 
 
 # Directory containing the initial seed files
-SEED_DIR="./images"  # Directory with initial seed files (e.g., PNG files)
-echo "Using executable: $EXECUTABLE"
+SEED_DIR="./images"
 
 SAVE_ALL_LOGS=0  # Set to 1 to save all logs, including successful runs
 SAVE_IMAGES=0  # Set to 1 to save all mutated images
@@ -56,13 +56,6 @@ while true; do
         SEED_NAME=$(basename "$SEED_FILE")  # Get the filename without the path
         SEED_NAME="${SEED_NAME%.*}"  # Remove the file extension
 
-        # Msan crashes on some seed files
-        # if the seed name starts with ct and ends with n0g04, skip it (but not if the char in the middle is 0)
-        #if [[ "$SEED_NAME" =~ ^ct.*n0g04$ && ! "$SEED_NAME" =~ ^ct0.*n0g04$ ]]; then
-            #echo "Skipping seed file: $SEED_NAME"
-        #    continue
-        #fi
-
         # Generate mutated versions from seed file
         SEED_NUMBER=$((SEED_NUMBER + 1))
 
@@ -80,8 +73,6 @@ while true; do
 
         for MUTATED_FILE in $MUTATED_DIR/*; do
             # Run the mutated file through the program that uses libspng
-            # Capture the exit status of the program
-            #strace -e trace=write $EXECUTABLE $MUTATED_FILE > $TMP_LOG_FILE 2>&1
             timeout 4s $EXECUTABLE $MUTATED_FILE > $TMP_LOG_FILE 2>&1
             EXIT_STATUS=$?
 
@@ -113,7 +104,7 @@ while true; do
                 echo "----------------------------------------------------" >> $SEGM_FAULT_CRASH_REPORT
 
                 if [ $SAVE_IMAGES -eq 1 ]; then
-                    # Save the file with a unique name based on the mutation count
+                    # Save the file with a unique name based on the total counter
                     cp $MUTATED_FILE $SEGM_FAULT_LOG_DIR/${SEED_NAME}_$COUNTER.png
                 fi
 
@@ -135,7 +126,7 @@ while true; do
                 echo "----------------------------------------------------" >> $ERROR_CRASH_REPORT
 
                 if [ $SAVE_IMAGES -eq 1 ]; then
-                    # Save the file with a unique name based on the mutation count
+                    # Save the file with a unique name based on the total counter
                     cp $MUTATED_FILE $ERROR_LOG_DIR/${SEED_NAME}_$COUNTER.png
                 fi
             fi
