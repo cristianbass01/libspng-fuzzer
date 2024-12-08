@@ -84,5 +84,5 @@ clean:
 	rm -rf libspng/build
 	rm -rf fuzz/*.fuzz
 	rm -rf $(BUILD_DIR) output_dir
-	rm -rf output/radamsa
+	rm -rf tmp
 	cd $(LIBSPNG_DIR) && rm -rf build
