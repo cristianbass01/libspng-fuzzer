@@ -1,0 +1,227 @@
+#########################################################
+################## Without sanitizers: ##################
+#########################################################
+
+Counter 5154000 + 4493000 = 9.647.000
+- Errors 0 + 0 = 0
+- Segm. faults 0 + 0 = 0 
+- time: 47800 + 9hr = 13.2 hr + 9 hr = 22hr
+
+## GENERAL ERRORS:
+-------------------------------------------------------------------------------------------
+
+// ERROR FOUND IN OPTIMIZED COMPILATION
+// Compilation with -Onumber causes segmentation fault if there is no exif data
+// for some configuration it throw segmentation fault even if there is exif data
+test(spng_set_exif(ctx, &exif));
+
+-------------------------------------------------------------------------------------------
+
+#########################################################
+############### With Address sanitizers: ################
+#########################################################
+
+Using executable: ./fuzz/generic_test_asan.fuzz
+Counter 1390000 + 539000 = 1.929.000
+- Errors 28408 + 11091 = 39.499
+- Segm. faults 0 + 0 = 0
+- time: 38318 + 15191 = 53.509 = 14,8 hr
+
+## Address sanitizer errors:
+
+[
+    {
+        "error": "heap-buffer-overflow",
+        "path": [
+            "memcpy",
+            "memcpy",
+            "read_buf",
+            "fill_window",
+            "deflate_slow",
+            "deflate",
+            "compress2",
+            "write_chunks_before_idat",
+            "spng_encode_chunks",
+            "spng_encode_image",
+            "fuzz_spng_write",
+            "main"
+        ],
+        "files": [
+            # different files with no immediate pattern
+        ]
+    },
+    {
+        "error": "heap-buffer-overflow",
+        "path": [
+            "memcpy",
+            "write_chunk",
+            "write_unknown_chunks",
+            "write_chunks_before_idat",
+            "spng_encode_chunks",
+            "spng_encode_image",
+            "fuzz_spng_write",
+            "main"
+        ],
+        "files": [
+            # a lot of different files with no immediate pattern
+        ]
+    },
+    {
+        "error": "heap-buffer-overflow",
+        "path": [
+            "memcpy",
+            "write_chunk",
+            "write_unknown_chunks",
+            "write_chunks_after_idat",
+            "spng_encode_chunks",
+            "encode_scanline",
+            "encode_row",
+            "spng_encode_image",
+            "fuzz_spng_write",
+            "main"
+        ],
+        "files": [
+            # different files with no immediate pattern
+        ]
+    },
+    {
+        "error": "heap-buffer-overflow",
+        "path": [
+            "memcpy",
+            "write_chunk",
+            "write_unknown_chunks",
+            "write_chunks_after_idat",
+            "spng_encode_chunks",
+            "encode_scanline",
+            "encode_row",
+            "spng_encode_row",
+            "fuzz_spng_write",
+            "main"
+        ],
+        "files": [
+            # different files with no immediate pattern
+        ]
+    },
+    {
+        "error": "heap-buffer-overflow",
+        "path": [
+            "MemcmpInterceptorCommon(void*,",
+            "memcmp",
+            "check_exif",
+            "spng_set_exif",
+            "fuzz_spng_write",
+            "main"
+        ],
+        "files": [
+            # a lot of different files with no immediate pattern
+        ]
+    }
+]
+
+# To see which files take a look at the analyzer.ipynb
+# Other errors has been found but without trace (see cells in analyzer.ipynb)
+
+#########################################################
+################ With Memory sanitizers: ################
+#########################################################
+
+Using executable: ./fuzz/generic_test_msan.fuzz
+./fuzz_radamsa.sh: line 42: 4027717 Segmentation fault      (core dumped) radamsa -o $MUTATED_FILES -s $SEED_NUMBER -n $MUTATIONS_PER_SEED_FILE $SEED_FILE
+Counter 4654592 + 1962000 + 668000 = 7.284.592
+- Errors 971 + 31257 + 11388 = 43.616
+- Segm. faults 0 + 0 + 0 = 0
+- time: 64500 + 43515 + 15159 = 123.174 = 34,2 hr
+
+## MEMORY SANITIZER ERRORS:
+
+-------------------------------------------------------------------------------------------
+
+ERROR IN MEMORY SANITIZER 
+error due to use of uninitialized variable in line 2905:
+text->text_length = strlen(text->text);
+in function read_non_idat_chunks
+in function read_chunk 
+which is used in all get and set methods,
+but throw error only in get methods and decode methods for images with text chunks
+
+TYPE OF ERROR: for every image in the format ct*n0g04 where * is 1, e, f, g, h, j, z (all images with text)
+
+Testing spng_decode_image(ctx, img, out_size, fmt, flags)... Uninitialized bytes in strlen at offset 8 inside [0x701000000006, 9)
+==847104==WARNING: MemorySanitizer: use-of-uninitialized-value
+    #0 0x7c6fd4a68e54 in read_non_idat_chunks spng.c
+    #1 0x7c6fd4a69cf5 in read_chunks spng.c
+    #2 0x7c6fd4a6b46b in spng_decode_image (libspng/build/libspng.so+0xb46b) (BuildId: 5187f185eac2c97a5bac5545051a8298a7bdd1a7)
+    #3 0x572abd3fccf9 in fuzz_spng_read /home/cristian/Documents/ru_courses/software_security/SS-libspng-fuzz/fuzz/generic_test.c:639:9
+    #4 0x572abd3f80cb in main /home/cristian/Documents/ru_courses/software_security/SS-libspng-fuzz/fuzz/generic_test.c:217:19
+    #5 0x7c6fd462a1c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #6 0x7c6fd462a28a in __libc_start_main csu/../csu/libc-start.c:360:3
+    #7 0x572abd35f634 in _start (/home/cristian/Documents/ru_courses/software_security/SS-libspng-fuzz/fuzz/generic_test_msan.fuzz+0x32634) (BuildId: cf7afa532aef04299dfbc5414d0d2616e9c18ae7)
+
+SUMMARY: MemorySanitizer: use-of-uninitialized-value spng.c in read_non_idat_chunks
+Exiting
+
+{
+    "error": "use-of-uninitialized-value",
+    "path": [
+        "read_non_idat_chunks",
+        "read_chunks",
+        "spng_get_plte",
+        "fuzz_spng_read",
+        "main"
+    ],
+    "files": [
+        "ct1n0g04",
+        "cten0g04",
+        "ctfn0g04",
+        "ctgn0g04",
+        "cthn0g04",
+        "ctjn0g04",
+        "ctzn0g04"
+    ]
+},
+
+-----------------------------------------------------------------------------------------------
+
+FOUND ANOTHER ERROR WITH MEMORY SANITIZER:
+
+Error found for configurations of images: tbbn2c16, tbgn2c16, tbrn2c08.
+
+Testing spng_get_exif(ctx, &exif)... returned 73: chunk not available
+Testing spng_decode_image(ctx, img, out_size, fmt, flags)... Uninitialized bytes in MemcmpInterceptorCommon at offset 0 inside [0x70f000000000, 6)
+==960416==WARNING: MemorySanitizer: use-of-uninitialized-value
+    #0 0x5555555c7df9 in memcmp (/home/cristian/Documents/ru_courses/software_security/SS-libspng-fuzz/fuzz/generic_test_msan.fuzz+0x73df9) (BuildId: b691c6883d2fc586f90583f35cd2c4fed5811682)
+    #1 0x7ffff7fa7409 in trns_row spng.c
+    #2 0x7ffff7face34 in spng_decode_scanline (libspng/build/libspng.so+0xae34) (BuildId: 5187f185eac2c97a5bac5545051a8298a7bdd1a7)
+    #3 0x7ffff7fad067 in spng_decode_row (libspng/build/libspng.so+0xb067) (BuildId: 5187f185eac2c97a5bac5545051a8298a7bdd1a7)
+    #4 0x7ffff7fae995 in spng_decode_image (libspng/build/libspng.so+0xc995) (BuildId: 5187f185eac2c97a5bac5545051a8298a7bdd1a7)
+    #5 0x5555556285b1 in fuzz_spng_read /home/cristian/Documents/ru_courses/software_security/SS-libspng-fuzz/fuzz/generic_test.c:623:9
+    #6 0x5555556201eb in main /home/cristian/Documents/ru_courses/software_security/SS-libspng-fuzz/fuzz/generic_test.c:213:19
+    #7 0x7ffff7c2a1c9 in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16
+    #8 0x7ffff7c2a28a in __libc_start_main csu/../csu/libc-start.c:360:3
+    #9 0x555555587754 in _start (/home/cristian/Documents/ru_courses/software_security/SS-libspng-fuzz/fuzz/generic_test_msan.fuzz+0x33754) (BuildId: b691c6883d2fc586f90583f35cd2c4fed5811682)
+
+SUMMARY: MemorySanitizer: use-of-uninitialized-value (/home/cristian/Documents/ru_courses/software_security/SS-libspng-fuzz/fuzz/generic_test_msan.fuzz+0x73df9) (BuildId: b691c6883d2fc586f90583f35cd2c4fed5811682) in memcmp
+Exiting
+
+{
+    "error": "use-of-uninitialized-value",
+    "path": [
+        "memcmp",
+        "trns_row",
+        "spng_decode_scanline",
+        "spng_decode_row",
+        "spng_decode_image",
+        "fuzz_spng_read",
+        "main"
+    ],
+    "files": [
+        "tbbn2c16",
+        "tbgn2c16",
+        "tbrn2c08"
+    ]
+}
+
+
+# Other errors has been found but without trace (see cells in analyzer.ipynb)
+
+-------------------------------------------------------------------------------------------

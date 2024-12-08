@@ -21,6 +21,7 @@ SEED_DIR="./images"  # Directory with initial seed files (e.g., PNG files)
 echo "Using executable: $EXECUTABLE"
 
 SAVE_ALL_LOGS=0  # Set to 1 to save all logs, including successful runs
+SAVE_IMAGES=0  # Set to 1 to save all mutated images
 
 # Directories to save mutated files and crash logs
 RADAMSA_DIR="./output/radamsa_$SANITIZER" 
@@ -111,8 +112,10 @@ while true; do
                 cat $TMP_LOG_FILE >> $SEGM_FAULT_CRASH_REPORT
                 echo "----------------------------------------------------" >> $SEGM_FAULT_CRASH_REPORT
 
-                # Save the file with a unique name based on the mutation count
-                cp $MUTATED_FILE $SEGM_FAULT_LOG_DIR/${SEED_NAME}_$COUNTER.png
+                if [ $SAVE_IMAGES -eq 1 ]; then
+                    # Save the file with a unique name based on the mutation count
+                    cp $MUTATED_FILE $SEGM_FAULT_LOG_DIR/${SEED_NAME}_$COUNTER.png
+                fi
 
             elif [ $EXIT_STATUS -ne 0 ]; then
                 # Increment the error count
@@ -131,8 +134,10 @@ while true; do
                 cat $TMP_LOG_FILE >> $ERROR_CRASH_REPORT
                 echo "----------------------------------------------------" >> $ERROR_CRASH_REPORT
 
-                # Save the file with a unique name based on the mutation count
-                cp $MUTATED_FILE $ERROR_LOG_DIR/${SEED_NAME}_$COUNTER.png
+                if [ $SAVE_IMAGES -eq 1 ]; then
+                    # Save the file with a unique name based on the mutation count
+                    cp $MUTATED_FILE $ERROR_LOG_DIR/${SEED_NAME}_$COUNTER.png
+                fi
             fi
 
             # Print the current mutation count on the same line
