@@ -24,7 +24,7 @@ SAVE_ALL_LOGS=0  # Set to 1 to save all logs, including successful runs
 SAVE_IMAGES=0  # Set to 1 to save all mutated images
 
 # Directories to save mutated files and crash logs
-RADAMSA_DIR="./output/radamsa_$SANITIZER" 
+RADAMSA_DIR="./tmp/radamsa_$SANITIZER" 
 MUTATED_DIR="$RADAMSA_DIR/mutated"
 TMP_LOG_FILE="$RADAMSA_DIR/tmp_log.txt"
 LOG_FILE="$RADAMSA_DIR/logs.txt"
