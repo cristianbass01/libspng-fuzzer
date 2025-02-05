@@ -10,7 +10,7 @@ We tested with various fuzzers:
 
 Using also different sanitazers.
 
-More information in the final report. 
+More informations and results in the final report. 
 
 ## How to run
 
